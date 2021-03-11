@@ -49,3 +49,18 @@ class Open3DReconstructionDataset:
                 intrinsics["intrinsic_matrix"][6],
                 intrinsics["intrinsic_matrix"][7],
             )
+        elif type == "matrix":
+            intrinsics = json.load(open(os.path.join(self.root_dir, "camera_intrinsic.json")))
+            intrinsic_matrix = np.zeros((3, 3), dtype=np.float64)
+            fx = intrinsics["intrinsic_matrix"][0]
+            fy = intrinsics["intrinsic_matrix"][4]
+            cx = intrinsics["intrinsic_matrix"][6]
+            cy = intrinsics["intrinsic_matrix"][7]
+            intrinsic_matrix[0, 0] = fx
+            intrinsic_matrix[0, 2] = cx
+            intrinsic_matrix[1, 1] = fy
+            intrinsic_matrix[1, 2] = cy
+            
+            intrinsic_matrix[2, 2] = 1
+
+            return intrinsic_matrix

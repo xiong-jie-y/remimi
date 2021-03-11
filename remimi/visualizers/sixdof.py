@@ -16,6 +16,9 @@ class OnahoPointCloudVisualizer:
         self.vis_bounding_box = vis_bounding_box
         self.vis_pcd = vis_pcd
 
+    def change_bounding_box_color(self, color):
+        self.vis_bounding_box.color = color
+
     def update_bounding_box(self, closest_bounding_box: o3d.geometry.OrientedBoundingBox):
         vis_bounding_box = self.vis_bounding_box
         vis_bounding_box.extent = closest_bounding_box.extent
