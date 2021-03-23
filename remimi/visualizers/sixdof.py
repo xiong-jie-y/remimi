@@ -9,8 +9,13 @@ class OnahoPointCloudVisualizer:
         vis_pcd = o3d.geometry.PointCloud()
         vis_bounding_box = o3d.geometry.OrientedBoundingBox()
         vis_bounding_box.extent = np.array([1,1,1])
+        self.lineset = o3d.geometry.LineSet()
         vis.add_geometry(vis_pcd)
         vis.add_geometry(vis_bounding_box)
+        vis.add_geometry(self.lineset)
+        coord = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.6, origin=[0,0,0])
+        # vis.add_geometry(coord)
+
 
         self.vis = vis
         self.vis_bounding_box = vis_bounding_box
@@ -23,8 +28,14 @@ class OnahoPointCloudVisualizer:
         vis_bounding_box = self.vis_bounding_box
         vis_bounding_box.extent = closest_bounding_box.extent
         vis_bounding_box.center = closest_bounding_box.center
+        vis_bounding_box.color = closest_bounding_box.color
         vis_bounding_box.R = closest_bounding_box.R
         self.vis.update_geometry(vis_bounding_box)
+
+    def update_axis(self, points):
+        self.lineset.points = o3d.utility.Vector3dVector(np.array(points))
+        self.lineset.lines = o3d.utility.Vector2iVector(np.array([[0, 1]]))
+        self.vis.update_geometry(self.lineset)
 
     def update_pcd(self, pcd: o3d.geometry.PointCloud):
         vis, vis_pcd = self.vis, self.vis_pcd
