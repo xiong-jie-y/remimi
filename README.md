@@ -4,6 +4,13 @@ This repository contains library and examples to do R&D of ML efficiently.
 ## Installation
 Please install pytorch, opencv (>4).
 
+Example installation procedure for cuda11 is
+
+```bash
+pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
+pip install opencv-python
+```
+
 ```bash
 git clone https://github.com/xiong-jie-y/remimi.git
 pip install . -e
