@@ -28,8 +28,13 @@ def get_inverse_map(depth, bits=2):
     
     return out
 
+import enum
+class ImageType(enum.Enum):
+    RGB = "rgb"
+    BGR = "bgr"
+
 class DPTPaseudoDepthCamera:
-    def __init__(self, model_path, sensor, model_type="dpt_hybrid", optimize=True, debug=False):
+    def __init__(self, model_path, sensor, model_type="dpt_hybrid", optimize=True, debug=False, output_type=ImageType.RGB, boundary_depth_removal=False):
         print("initialize")
 
         # set torch options
@@ -102,6 +107,8 @@ class DPTPaseudoDepthCamera:
         self.debug = debug
 
         self.sensor = sensor
+        self.output_type = output_type
+        self.boundary_depth_removal = boundary_depth_removal
 
     def get_color_and_depth(self):
         img = self.sensor.get_color()
@@ -135,4 +142,20 @@ class DPTPaseudoDepthCamera:
         color = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         depth = get_inverse_map(prediction.astype(np.uint16))
 
-        return color, depth
+        if self.boundary_depth_removal:
+            color2 = np.copy(color)
+            cv2.cvtColor(color2, cv2.COLOR_RGB2GRAY)
+            canny_img = cv2.Canny(color2, 50, 110)
+            kernel = np.ones((5,5),np.uint8)
+            canny_img = cv2.dilate(canny_img,kernel,iterations = 2)
+
+            cv2.imshow("test2222", canny_img)
+
+            depth[canny_img == 255] = 0
+
+        if self.output_type == ImageType.BGR:
+            return img, depth
+        elif self.output_type == ImageType.RGB:
+            return color, depth
+        else:
+            raise RuntimeError(f"no such image type {self.output_type}.")

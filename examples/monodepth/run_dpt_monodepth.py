@@ -11,7 +11,7 @@ from remimi.sensors.realsense import RealsenseD435i
 from remimi.sensors.webcamera import SimpleWebcamera
 from remimi.visualizers.point_cloud import SimplePointCloudVisualizer
 from remimi.utils.open3d import create_point_cloud_from_color_and_depth
-from remimi.sensors.paseudo_camera import DPTPaseudoDepthCamera
+from remimi.sensors.paseudo_camera import DPTPaseudoDepthCamera, ImageType
 
 def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False, webcam_id=4, video_file=None):
     """Run MonoDepthNN to compute depth maps.
@@ -37,7 +37,7 @@ def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False,
             1280, 720, 525.0, 525.0, 639.0, 359.25
         )
 
-    cam = DPTPaseudoDepthCamera(model_path, sensor, model_type, optimize)
+    cam = DPTPaseudoDepthCamera(model_path, sensor, model_type, optimize, output_type=ImageType.RGB)
     vis = SimplePointCloudVisualizer()
 
     print("start processing")
