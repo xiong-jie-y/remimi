@@ -1,6 +1,6 @@
 # Realtime Monocular Depth Estimation Examples
 ## DPT
-
+![](./images/monodepth_static.gif)
 
 ```bash
 # (1) Install dependencies https://github.com/xiong-jie-y/DPT#setup
