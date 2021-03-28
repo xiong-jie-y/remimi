@@ -140,7 +140,7 @@ def get_inverse_map(depth, bits=2):
     
     return out
 
-def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False):
+def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False, webcam_id=4):
     """Run MonoDepthNN to compute depth maps.
 
     Args:
@@ -153,7 +153,7 @@ def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False)
         sensor = RealsenseD435i(resolution=(640, 480))
         intrinsic = sensor.get_open3d_intrinsic()
     else:
-        sensor = SimpleWebcamera(4)
+        sensor = SimpleWebcamera(webcam_id)
         intrinsic = o3d.camera.PinholeCameraIntrinsic(
             o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
         )
@@ -218,6 +218,7 @@ if __name__ == "__main__":
     parser.add_argument("--optimize", dest="optimize", action="store_true")
     parser.add_argument("--no-optimize", dest="optimize", action="store_false")
     parser.add_argument("--use-realsense", action="store_true")
+    parser.add_argument("--webcam-id", type=int, default=0)
     parser.set_defaults(optimize=True)
 
     args = parser.parse_args()
@@ -240,5 +241,6 @@ if __name__ == "__main__":
         args.model_weights,
         args.model_type,
         args.optimize,
-        args.use_realsense
+        args.use_realsense,
+        args.webcam_id
     )
