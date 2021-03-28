@@ -1,1 +1,2 @@
-pip install open3d
+open3d
+dpt @ git+https://github.com/xiong-jie-y/DPT.git
