@@ -123,6 +123,7 @@ class DPTPaseudoDepthCamera:
 
 import open3d as o3d
 from remimi.sensors.realsense import RealsenseD435i
+from remimi.sensors.webcamera import SimpleWebcamera
 from remimi.visualizers.point_cloud import SimplePointCloudVisualizer
 
 def get_inverse_map(depth, bits=2):
@@ -139,7 +140,7 @@ def get_inverse_map(depth, bits=2):
     
     return out
 
-def run(input_path, output_path, model_path, model_type="dpt_hybrid", optimize=True):
+def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False):
     """Run MonoDepthNN to compute depth maps.
 
     Args:
@@ -148,9 +149,17 @@ def run(input_path, output_path, model_path, model_type="dpt_hybrid", optimize=T
         model_path (str): path to saved model
     """
 
-    sensor = RealsenseD435i(resolution=(640, 480))
+    if use_realsense:
+        sensor = RealsenseD435i(resolution=(640, 480))
+        intrinsic = sensor.get_open3d_intrinsic()
+    else:
+        sensor = SimpleWebcamera(4)
+        intrinsic = o3d.camera.PinholeCameraIntrinsic(
+            o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
+        )
+        
+
     cam = DPTPaseudoDepthCamera(model_path, sensor, model_type, optimize)
-    intrinsic = sensor.get_open3d_intrinsic()
     vis = SimplePointCloudVisualizer()
 
     print("start processing")
@@ -208,6 +217,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--optimize", dest="optimize", action="store_true")
     parser.add_argument("--no-optimize", dest="optimize", action="store_false")
+    parser.add_argument("--use-realsense", action="store_true")
     parser.set_defaults(optimize=True)
 
     args = parser.parse_args()
@@ -227,9 +237,8 @@ if __name__ == "__main__":
 
     # compute depth maps
     run(
-        args.input_path,
-        args.output_path,
         args.model_weights,
         args.model_type,
         args.optimize,
+        args.use_realsense
     )
