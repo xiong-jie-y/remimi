@@ -140,7 +140,7 @@ def get_inverse_map(depth, bits=2):
     
     return out
 
-def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False, webcam_id=4):
+def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False, webcam_id=4, video_file=None):
     """Run MonoDepthNN to compute depth maps.
 
     Args:
@@ -153,11 +153,13 @@ def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False,
         sensor = RealsenseD435i(resolution=(640, 480))
         intrinsic = sensor.get_open3d_intrinsic()
     else:
-        sensor = SimpleWebcamera(webcam_id)
+        if video_file is not None:
+            sensor = SimpleWebcamera(video_file)
+        else:
+            sensor = SimpleWebcamera(webcam_id)
         intrinsic = o3d.camera.PinholeCameraIntrinsic(
             o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
         )
-        
 
     cam = DPTPaseudoDepthCamera(model_path, sensor, model_type, optimize)
     vis = SimplePointCloudVisualizer()
@@ -165,6 +167,7 @@ def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False,
     print("start processing")
     while True:
         color, depth = cam.get_next_frame()
+
         # color, depth = sensor.get_color_and_depth()
         
         depth_image = o3d.geometry.Image(depth)
@@ -181,6 +184,7 @@ def run(model_path, model_type="dpt_hybrid", optimize=True, use_realsense=False,
         vis.update_by_pcd(temp)
         # cv2.imshow("Depth", util.io.get_depth(depth, bits=2))
         cv2.imshow("Depth", depth)
+        cv2.imshow("color", color)
         key = cv2.waitKey(1)
         if key  == ord('a'):
             vis.stop_update()
@@ -192,14 +196,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-i", "--input_path", default="input", help="folder with input images"
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output_path",
-        default="output_monodepth",
-        help="folder for output images",
+        "-i", "--input-file", help="video file to show point cloud."
     )
 
     parser.add_argument(
@@ -242,5 +239,6 @@ if __name__ == "__main__":
         args.model_type,
         args.optimize,
         args.use_realsense,
-        args.webcam_id
+        args.webcam_id,
+        args.input_file
     )
