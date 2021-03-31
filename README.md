@@ -5,6 +5,7 @@ Feel free to post issue and PR when you find problem or new feature.
 
 ## Installation
 Everything is tested on Ubuntu 20.04.
+Most of the script requires GPU.
 
 Please install pytorch, opencv (>4).
 
@@ -31,6 +32,8 @@ To run this script,
 ```
 python examples/remove_people.py --input-file ${INPUT_FILE_PATH} --output-file ${OUTPUT_FILE_PATH}
 ```
+
+And please wait until finishes.
 
 ### Realtime Monocular Depth Estimation Examples with DPT
 ![](./images/monodepth_static.gif)
