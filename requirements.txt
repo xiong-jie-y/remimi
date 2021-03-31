@@ -1,2 +1,19 @@
+# Common
+opencv-python
 open3d
+click
+numpy
+progressbar2
+
+# DPT Depth Estimation
 dpt @ git+https://github.com/xiong-jie-y/DPT.git
+
+# Adobe Depth Estimation
+cupy
+
+# huawei inpaint
+tensorflow==2.3.1
+moviepy
+
+# Segmentation
+mmsegmentation

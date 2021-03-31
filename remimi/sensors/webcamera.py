@@ -1,3 +1,4 @@
+from remimi.sensors import StreamFinished
 import cv2
 
 class SimpleWebcamera:
@@ -6,5 +7,8 @@ class SimpleWebcamera:
 
     def get_color(self):
         flag, frame = self.cap.read()
+
+        if not flag:
+            raise StreamFinished()
 
         return frame

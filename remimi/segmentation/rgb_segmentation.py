@@ -1,18 +1,15 @@
+from remimi.utils.file import get_model_file
 from mmseg.apis import inference_segmentor, init_segmentor
-import mmcv
 import cv2
 import numpy as np
+from pkg_resources import resource_filename
 
 class SemanticSegmenter:
     def __init__(self):
-        # config_file = '/home/yusuke/gitrepos/mmsegmentation/configs/ocrnet/ocrnet_hr18s_512x512_80k_ade20k.py'
-        # checkpoint_file = '/home/yusuke/gitrepos/mmsegmentation/checkpoints/ocrnet_hr18s_512x512_80k_ade20k_20200615_055600-e80b62af.pth'
-
-
-        config_file = '/home/yusuke/gitrepos/mmsegmentation/configs/dnlnet/dnl_r101-d8_512x512_80k_ade20k.py'
-        checkpoint_file = '/home/yusuke/gitrepos/mmsegmentation/checkpoints/dnl_r101-d8_512x512_80k_ade20k_20200826_183354-d820d6ea.pth'
-        ## config_file = '/home/yusuke/gitrepos/mmsegmentation/configs/sem_fpn/fpn_r50_512x512_160k_ade20k.py'
-        # checkpoint_file = '/home/yusuke/gitrepos/mmsegmentation/checkpoints/fpn_r50_512x512_160k_ade20k_20200718_131734-5b5a6ab9.pth'
+        config_file = resource_filename("remimi", "segmentation/configs/dnlnet/dnl_r101-d8_512x512_80k_ade20k.py")
+        checkpoint_file = get_model_file(
+            "dln_small.pth", 
+            "https://download.openmmlab.com/mmsegmentation/v0.5/dnlnet/dnl_r50-d8_512x512_80k_ade20k/dnl_r50-d8_512x512_80k_ade20k_20200826_183354-1cf6e0c1.pth")
 
         # build the model from a config file and a checkpoint file
         model = init_segmentor(config_file, checkpoint_file, device='cuda:0')
