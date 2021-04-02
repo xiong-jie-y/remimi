@@ -11,14 +11,22 @@ Most of the script requires GPU.
 
 Please install pytorch, opencv (>4).
 
-Example installation procedure for cuda11 is
+### Dependencies
+For cuda10
+```bash
+pip install torch torchvision torchaudio
+pip install opencv-python
+pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.8.0/index.html
+```
 
+For Cuda11.
 ```bash
 pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
 pip install opencv-python
 pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.8.0/index.html
 ```
 
+### Remimi Installation
 ```bash
 git clone https://github.com/xiong-jie-y/remimi.git
 pip install . -e
