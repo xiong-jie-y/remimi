@@ -1,5 +1,7 @@
 # remimi
-This repository contains library and examples to do R&D of ML efficiently.
+This repository contains python library and examples to do R&D of computer vision ML efficiently. Especially this library focus on stream video or camera input processing.
+
+This library is optimized for efficient R&D and might not fit some kind of products.
 
 Feel free to post issue and PR when you find problem or new feature.
 
@@ -56,3 +58,6 @@ python examples/monodepth/run_dpt_monodepth.py -m ~/gitrepos/DPT/weights/dpt_hyb
 # You can also show video file.
 python examples/monodepth/run_dpt_monodepth.py -m ~/gitrepos/DPT/weights/dpt_hybrid-midas-501f0c75.pt --input-file $VIDEO_FILE
 ```
+
+## LICENSE
+This library and scripts are [MIT License](LICENSE). Some components has different license because they are inported from other repos for better integration. LICENSE files are in each directory.
