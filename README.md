@@ -11,6 +11,14 @@ Most of the script requires GPU.
 
 Please install pytorch, opencv (>4).
 
+### Conda Environment
+I recommend using environment management tool.
+This is the example of using [conda](https://docs.conda.io/en/latest/miniconda.html).
+```
+conda create -n py38_remimi python=3.8.5
+conda activate py38_remimi
+```
+
 ### Dependencies
 For cuda10
 ```bash
