@@ -9,9 +9,10 @@ from remimi.sensors import StreamFinished
 @click.option("--input-file")
 @click.option("--output-folder")
 @click.option("--class-names", multiple=True)
-def main(input_file, output_folder, class_names):
+@click.option("--margin", type=int, default=1)
+def main(input_file, output_folder, class_names, margin):
     video_stream = SimpleWebcamera(input_file)
-    sink = SaveMaskAndFrameSink(video_stream, output_folder, class_names)
+    sink = SaveMaskAndFrameSink(video_stream, output_folder, class_names, margin)
 
     while True:
         try:

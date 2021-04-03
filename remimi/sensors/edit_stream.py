@@ -8,10 +8,11 @@ from remimi.segmentation.rgb_segmentation import SemanticSegmenter
 
 
 class HumanEliminatedStream:
-    def __init__(self, sensor):
+    def __init__(self, sensor, margin=1):
         self.sensor = sensor
         self.semantic_segmentater = SemanticSegmenter()
         self.eliminator = MaskEliminator()
+        self.margin = margin
 
     def get_color(self):
         color = self.sensor.get_color()
@@ -20,13 +21,13 @@ class HumanEliminatedStream:
         color2 = self.semantic_segmentater.get_mask(color, ["person"])
 
         kernel = np.ones((5,5),np.uint8)
-        color2 = cv2.erode(color2,kernel,iterations = 3)
+        color2 = cv2.erode(color2,kernel,iterations = self.margin)
         cv2.imshow("Mask", color2)
 
         return self.eliminator.eliminate_by_mask(color, cv2.cvtColor(color2, cv2.COLOR_GRAY2BGR))
 
 class SaveMaskAndFrameSink:
-    def __init__(self, stream, output_root, class_names):
+    def __init__(self, stream, output_root, class_names, margin):
         self.stream = stream
         os.makedirs(join(output_root, "masks"), exist_ok=True)
         os.makedirs(join(output_root, "frames"), exist_ok=True)
@@ -35,6 +36,7 @@ class SaveMaskAndFrameSink:
         self.semantic_segmentater = SemanticSegmenter()
         self.class_names = class_names
         self.output_root = output_root
+        self.margin = margin
 
     def process(self, show=False):
         filename = str(self.frame_count).zfill(5)
@@ -44,6 +46,9 @@ class SaveMaskAndFrameSink:
         cv2.imwrite(join(self.output_root, "frames/{}.jpg".format(filename)), color)
 
         color2 = self.semantic_segmentater.get_mask(color, self.class_names)
+
+        kernel = np.ones((5,5),np.uint8)
+        color2 = cv2.erode(color2,kernel,iterations = self.margin)
 
         white_mask = np.zeros(color2.shape, dtype=np.uint8)
         white_mask[color2 == 0] = 255
