@@ -1,12 +1,18 @@
 import numpy as np
 import pyrealsense2 as rs
 import open3d as o3d
+import cupoch
 
 class RealsenseD435i():
-    def __init__(self, resolution=(848, 480)):
+    def __init__(self, resolution=(848, 480), high_accurate_depth=True):
         widht, height = resolution
         config = rs.config()
-        config.enable_stream(rs.stream.color, widht, height, rs.format.bgr8, 60)
+        if high_accurate_depth:
+            # Fixed steram and will be alinged to color.
+            config.enable_stream(rs.stream.color, 848, 480, rs.format.bgr8, 60)
+        else:
+            config.enable_stream(rs.stream.color, widht, height, rs.format.bgr8, 60)
+        
         #
         config.enable_stream(rs.stream.depth, widht, height, rs.format.z16, 60)
         config.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 250)
@@ -20,6 +26,7 @@ class RealsenseD435i():
 
         depth_sensor = profile.get_device().first_depth_sensor()
         scale=  depth_sensor.get_depth_scale()
+        depth_sensor.set_option(rs.option.visual_preset, 3)
         print(f"scale: {scale}")
 
         self.resolution = resolution
@@ -60,6 +67,14 @@ class RealsenseD435i():
         video_profile = self.run_config.get_stream(rs.stream.color)
         intrinsics = video_profile.as_video_stream_profile().intrinsics
         out = o3d.camera.PinholeCameraIntrinsic(self.resolution[0], self.resolution[1], intrinsics.fx,
+                                                intrinsics.fy, intrinsics.ppx,
+                                                intrinsics.ppy)
+        return out
+
+    def get_cupoch_intrinsic(self):
+        video_profile = self.run_config.get_stream(rs.stream.color)
+        intrinsics = video_profile.as_video_stream_profile().intrinsics
+        out = cupoch.camera.PinholeCameraIntrinsic(self.resolution[0], self.resolution[1], intrinsics.fx,
                                                 intrinsics.fy, intrinsics.ppx,
                                                 intrinsics.ppy)
         return out
