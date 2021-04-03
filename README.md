@@ -53,6 +53,17 @@ python examples/remove_people.py --input-file ${INPUT_FILE_PATH} --output-file $
 
 And please wait until finishes.
 
+### Mask Creation
+![](./images/mask_original.jpg)
+![](./images/mask_mask.png)
+
+You can create dataset consists of mask of arbitracy class and frame by running the command.
+You can find classes from [here](https://github.com/open-mmlab/mmsegmentation/blob/91159e2e5b9ac258440d714a40e0df6083aafee4/mmseg/datasets/ade.py#L15).
+
+```
+python examples/data_conversion/create_mask_image_dataset.py --input-file MOT17-02-FRCNN-raw.webm --output-folder test_imgs --class-names person
+```
+
 ### Realtime Monocular Depth Estimation Examples with DPT
 ![](./images/monodepth_static.gif)
 
