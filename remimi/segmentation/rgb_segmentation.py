@@ -1,3 +1,4 @@
+from typing import List
 from remimi.utils.file import get_model_file
 from mmseg.apis import inference_segmentor, init_segmentor
 import cv2
@@ -14,14 +15,9 @@ class SemanticSegmenter:
         # build the model from a config file and a checkpoint file
         model = init_segmentor(config_file, checkpoint_file, device='cuda:0')
 
-        model.PALETTE[12] = [0,0,0]
-        model.PALETTE[33] = [0,0,255]
-        model.PALETTE[15] = [0,255,0]
-        model.PALETTE[7] = [255, 255, 255]
-
         self.model = model
 
-    
+
     def convert_to_semantic_image(self, color_image_bgr):
         frame = cv2.cvtColor(color_image_bgr, cv2.COLOR_BGR2RGB)
         result = inference_segmentor(self.model, frame)
@@ -39,3 +35,24 @@ class SemanticSegmenter:
         for label, color in enumerate(palette):
             color_seg[seg == label, :] = color
         return color_seg
+
+    def get_mask(self, color_image_bgr: np.ndarray, class_names: List[str]):
+        """Get mask from class_name.
+
+        The class that is in class_names will be black(0).
+        Other part will be white(255).
+        """
+        frame = cv2.cvtColor(color_image_bgr, cv2.COLOR_BGR2RGB)
+        result = inference_segmentor(self.model, frame)
+        seg = result[0]
+        mask = np.zeros((seg.shape[0], seg.shape[1]), dtype=np.uint8)
+        mask[:,:] = 255
+        for class_name in class_names:
+            try:
+                index = self.model.CLASSES.index(class_name)
+            except ValueError:
+                print(F"Available classes are {self.model.CLASSES}")
+                raise
+            mask[seg == index] = 0
+
+        return mask
