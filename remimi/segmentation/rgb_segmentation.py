@@ -7,10 +7,16 @@ from pkg_resources import resource_filename
 
 class SemanticSegmenter:
     def __init__(self):
-        config_file = resource_filename("remimi", "segmentation/configs/dnlnet/dnl_r101-d8_512x512_80k_ade20k.py")
+        # config_file = resource_filename("remimi", "segmentation/configs/dnlnet/dnl_r101-d8_512x512_80k_ade20k.py")
+        # checkpoint_file = get_model_file(
+        #     "dln_small.pth", 
+        #     "https://download.openmmlab.com/mmsegmentation/v0.5/dnlnet/dnl_r50-d8_512x512_80k_ade20k/dnl_r50-d8_512x512_80k_ade20k_20200826_183354-1cf6e0c1.pth")
+
+        config_file = resource_filename("remimi", "segmentation/configs/deeplabv3plus/deeplabv3plus_r101-d8_512x512_160k_ade20k.py")
         checkpoint_file = get_model_file(
-            "dln_small.pth", 
-            "https://download.openmmlab.com/mmsegmentation/v0.5/dnlnet/dnl_r50-d8_512x512_80k_ade20k/dnl_r50-d8_512x512_80k_ade20k_20200826_183354-1cf6e0c1.pth")
+            "deeplabv3plus_r101-d8_512x512_160k_ade20k_20200615_123232-38ed86bb.pth",
+            "https://download.openmmlab.com/mmsegmentation/v0.5/deeplabv3plus/deeplabv3plus_r101-d8_512x512_160k_ade20k/deeplabv3plus_r101-d8_512x512_160k_ade20k_20200615_123232-38ed86bb.pth"
+        )
 
         # build the model from a config file and a checkpoint file
         model = init_segmentor(config_file, checkpoint_file, device='cuda:0')

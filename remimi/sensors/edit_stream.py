@@ -1,5 +1,6 @@
 import os
 from os.path import join
+from remimi.detection.instance_segmentation import InstanceSegmenter
 from remimi.edit.hifill.hifill import MaskEliminator
 import cv2
 import numpy as np
@@ -33,7 +34,8 @@ class SaveMaskAndFrameSink:
         os.makedirs(join(output_root, "frames"), exist_ok=True)
         self.frame_count = 0
         
-        self.semantic_segmentater = SemanticSegmenter()
+        # self.semantic_segmentater = SemanticSegmenter()
+        self.semantic_segmentater = InstanceSegmenter()
         self.class_names = class_names
         self.output_root = output_root
         self.margin = margin
@@ -47,8 +49,12 @@ class SaveMaskAndFrameSink:
 
         color2 = self.semantic_segmentater.get_mask(color, self.class_names)
 
-        kernel = np.ones((5,5),np.uint8)
-        color2 = cv2.erode(color2,kernel,iterations = self.margin)
+        if self.margin < 0:
+            kernel = np.ones((5,5),np.uint8)
+            color2 = cv2.dilate(color2,kernel,iterations = self.margin)
+        elif self.margin > 0:
+            kernel = np.ones((5,5),np.uint8)
+            color2 = cv2.erode(color2,kernel,iterations = self.margin)
 
         white_mask = np.zeros(color2.shape, dtype=np.uint8)
         white_mask[color2 == 0] = 255
