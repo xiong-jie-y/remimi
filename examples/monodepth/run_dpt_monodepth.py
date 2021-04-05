@@ -72,27 +72,47 @@ class DepthScaleFixer:
 
         return depth
 
+import youtube_dl
+
 @click.command()
 @click.option("--use-realsense", is_flag=True)
 @click.option("--webcam-id", type=int, default=4)
 @click.option("--video-file")
+@click.option("--video-url")
 @click.option("--use-cache", is_flag=True)
-@click.option("--fps", type=float)
 @click.option("--cache-root")
 @click.option("--model-name", default="ken3d")
-def run(use_realsense, webcam_id, video_file, use_cache, cache_root, fps, model_name):
+def run(use_realsense, webcam_id, video_file, video_url, use_cache, cache_root, model_name):
+    if video_url is not None:
+        ydl_opts = {
+            "outtmpl": join(cache_root, "videos", "%(id)s.%(ext)s")
+        }
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            a = ydl.extract_info(video_url)
+            original_video_file = join(cache_root, "videos", f"{a['id']}.{a['ext']}")
+            video_file = join(cache_root, "videos", f"{a['id']}_res.mp4")
+            
+            if not os.path.exists(original_video_file):
+                original_video_file = join(cache_root, "videos", f"{a['id']}.mkv")
+
+            import subprocess
+            subprocess.run(f"ffmpeg -y -i {original_video_file} -s 640x480  {video_file}", shell=True, check=True)
+
     cache_folder = join(cache_root, basename(video_file))
     os.makedirs(cache_folder, exist_ok=True)
 
+    fps = None
     if use_realsense:
         sensor = RealsenseD435i(resolution=(640, 480))
         # sensor = RealsenseD435i()
         intrinsic = sensor.get_open3d_intrinsic()
     else:
         if video_file is not None:
-            sensor = SimpleWebcamera(video_file, fps)
+            sensor = SimpleWebcamera(video_file)
+            fps = sensor.get_fps()
+            print(f"fps is {fps}hz.")
         else:
-            sensor = SimpleWebcamera(webcam_id, fps)
+            sensor = SimpleWebcamera(webcam_id)
         intrinsic = o3d.camera.PinholeCameraIntrinsic(
             # o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
             640, 480, 1000.0, 1000.0, 319.5, 239.5

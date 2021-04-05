@@ -12,9 +12,20 @@ def _parse_requirements(path):
 
 requirements = _parse_requirements('requirements.txt')
 
+from setuptools.command.install import install
+from subprocess import getoutput
+
+class PostInstall(install):
+    pkgs = ' git+https://github.com/xiong-jie-y/mmdetection.git'
+    def run(self):
+        install.run(self)
+        print(getoutput('pip install'+self.pkgs))
+
+
 setuptools.setup(
     name='remimi',
     version=__version__,
     packages=setuptools.find_packages(),
-    install_requires=requirements
+    install_requires=requirements,
+    cmdclass={'install': PostInstall}
 )

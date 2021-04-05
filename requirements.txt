@@ -4,6 +4,10 @@ open3d
 click
 numpy
 progressbar2
+pyrealsense2
+cupoch
+
+# For 3d dance viewer.
 
 # DPT Depth Estimation
 dpt @ git+https://github.com/xiong-jie-y/DPT.git
@@ -17,3 +21,6 @@ moviepy
 
 # Segmentation
 mmsegmentation
+
+# detection
+mmdet @ git+https://github.com/open-mmlab/mmdetection.git
