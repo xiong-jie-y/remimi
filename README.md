@@ -64,7 +64,7 @@ You can find classes from [here](https://github.com/open-mmlab/mmsegmentation/bl
 python examples/data_conversion/create_mask_image_dataset.py --input-file MOT17-02-FRCNN-raw.webm --output-folder test_imgs --class-names person
 ```
 
-### Realtime Monocular Depth Estimation Examples with DPT
+### Realtime Monocular Depth Estimation Examples with DPT(broken now)
 ![](./images/monodepth_static.gif)
 
 This script will show point cloud from the camera stream.
