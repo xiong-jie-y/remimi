@@ -20,7 +20,8 @@ import youtube_dl
 @click.option("--video-url")
 @click.option("--cache-root")
 @click.option("--model-name", default="ken3d")
-def run(video_file, video_url, cache_root, model_name):
+@click.option("--save-point-cloud", is_flag=True)
+def run(video_file, video_url, cache_root, model_name, save_point_cloud):
     if video_url is not None:
         video_file = ensure_video(video_url, cache_root)
 
@@ -80,7 +81,8 @@ def run(video_file, video_url, cache_root, model_name):
         #                                         std_ratio=1.0)
         # np.save(join(cache_folder, "{}_outlier".format(suffix)), ind)
 
-        o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), pcd)
+        if save_point_cloud:
+            o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), pcd)
 
         # To see realsense input.
         # color, depth = sensor.get_color_and_depth()
