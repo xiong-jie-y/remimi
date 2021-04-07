@@ -1,5 +1,8 @@
 import os
 from os.path import basename, join
+from remimi.utils.file import ensure_video
+from remimi.utils.depth import colorize, colorize2
+from remimi.utils.logging import PerfLogger
 import numpy as np
 import cv2
 
@@ -23,11 +26,11 @@ class ScaleFixer:
     def fix_scale(self, pcd):
         points = np.array(pcd.points)
         # farest_depth = np.max(points[:, 2])
-        farest_y = np.max(points[:, 1])
-        farest_x = np.max(points[:, 0])
+        farest_y = np.percentile(points[::4, 1], 95)
+        farest_x = np.percentile(points[::4, 0], 95)
         # closest_depth = np.min(points[:, 2])
-        closest_y = np.min(points[:, 1])
-        closest_x = np.min(points[:, 0])
+        closest_y = np.percentile(points[::4, 1], 5)
+        closest_x = np.percentile(points[::4, 0], 5)
         if len(self.farest_ys) < 20:
             # self.farest_depths.append(farest_depth)
             # self.closest_depths.append(closest_depth)
@@ -81,19 +84,7 @@ import youtube_dl
 @click.option("--model-name", default="ken3d")
 def run(video_file, video_url, cache_root, model_name):
     if video_url is not None:
-        ydl_opts = {
-            "outtmpl": join(cache_root, "videos", "%(id)s.%(ext)s")
-        }
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            a = ydl.extract_info(video_url)
-            original_video_file = join(cache_root, "videos", f"{a['id']}.{a['ext']}")
-            video_file = join(cache_root, "videos", f"{a['id']}_res.mp4")
-            
-            if not os.path.exists(original_video_file):
-                original_video_file = join(cache_root, "videos", f"{a['id']}.mkv")
-
-            import subprocess
-            subprocess.run(f"ffmpeg -y -i {original_video_file} -s 640x480  {video_file}", shell=True, check=True)
+        video_file = ensure_video(video_url, cache_root)
 
     cache_folder = join(cache_root, basename(video_file))
     os.makedirs(cache_folder, exist_ok=True)
@@ -127,7 +118,7 @@ def run(video_file, video_url, cache_root, model_name):
     )
     # vis = InpaintedPointCloudVisualizer()
 
-    vis.vis.get_render_option().point_size = 1
+    vis.vis.get_render_option().point_size = 2
 
     from pydub import AudioSegment
     from pydub.playback import play
@@ -142,68 +133,88 @@ def run(video_file, video_url, cache_root, model_name):
     frame_no = 0
     print("start processing")
     last_time = time.time() - 100
-    t = threading.Thread(target=play_ex)
-    t.start()
+
     scale_fixer = ScaleFixer()
     depth_fixer = DepthScaleFixer()
+
+    time_logger = PerfLogger(print=False)
+
+    t = threading.Thread(target=play_ex)
+    t.start()
+
+    start_time = time.time()
+    if fps is not None:
+        sec_per_frame = (1./fps)
+
     while True:
         if fps is not None:
             elapsed = (time.time() - last_time)
-            if elapsed < (1./fps):
+            if elapsed < sec_per_frame:
                 continue
             last_time = time.time()
 
+            if ((time.time() - start_time) - (frame_no * sec_per_frame)) > 2 * sec_per_frame:
+                frame_no += 2
+
         suffix = str(frame_no).zfill(6)
 
-        color = cv2.imread(join(cache_folder, "{}_color.jpg".format(str(frame_no).zfill(6))))
-        file2 = join(cache_folder, "{}_depth.png".format(suffix))
+        with time_logger.time_measure("1frame"):
+            with time_logger.time_measure("io"):
+                color = cv2.imread(join(cache_folder, "{}_color.jpg".format(str(frame_no).zfill(6))))
+                file2 = join(cache_folder, "{}_depth.png".format(suffix))
 
-        if os.path.exists(file2):
-            depth = cv2.imread(file2, -1)
-        else:
-            depth = np.load(join(cache_folder, "{}_depth.npy".format(suffix)))
+                if os.path.exists(file2):
+                    depth = cv2.imread(file2, -1)
+                else:
+                    depth = np.load(join(cache_folder, "{}_depth.npy".format(suffix)))
 
-        # import IPython; IPython.embed()
-        # depth = depth_fixer.fix_scale(depth)
+                # depth = cv2.ximgproc.weightedMedianFilter(color, depth, 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
 
-        pcd = create_point_cloud_from_color_and_depth(color, depth, intrinsic)
-        # ind = np.load(join(cache_folder, "{}_outlier.npy".format(suffix)))
-        # pcd = o3d.io.read_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))))
+            # import IPython; IPython.embed()
+            # depth = depth_fixer.fix_scale(depth)
 
-        # pcd = pcd.voxel_down_sample(voxel_size=0.0008)
-        # _, ind = pcd.remove_statistical_outlier(nb_neighbors=20,
-        #                                         std_ratio=1.0)
-        # inlier_cloud = pcd.select_by_index(ind)
-        # print(len(np.array(pcd.points)))
-        # o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), inlier_cloud)
-        # pcd = inlier_cloud
- 
-        scale_fixer.fix_scale(pcd)
+            with time_logger.time_measure("create_point_cloud_from_color_and_depth"):
+                pcd = create_point_cloud_from_color_and_depth(color, depth, intrinsic)
+            # ind = np.load(join(cache_folder, "{}_outlier.npy".format(suffix)))
+            # pcd = o3d.io.read_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))))
 
-        vis.update_by_pcd(pcd)
+            # pcd = pcd.voxel_down_sample(voxel_size=0.0008)
+            # _, ind = pcd.remove_statistical_outlier(nb_neighbors=20,
+            #                                         std_ratio=1.0)
+            # inlier_cloud = pcd.select_by_index(ind)
+            # print(len(np.array(pcd.points)))
+            # o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), inlier_cloud)
+            # pcd = inlier_cloud
+    
+            with time_logger.time_measure("fix_scale"):
+                scale_fixer.fix_scale(pcd)
 
-        # extrinsic = \
-        #     np.array([[ 1.        ,  0.        ,  0.        ,  x],
-        #             [-0.        , -1.        , -0.        ,  0],
-        #             [-0.        , -0.        , -1.        ,  0],
-        #             [ 0.        ,  0.        ,  0.        ,  1.        ]])
+            with time_logger.time_measure("update_by_pcd"):
+                vis.update_by_pcd(pcd)
 
-        # pcam = o3d.camera.PinholeCameraParameters()
-        # pcam.intrinsic = intrinsic
-        # pcam.extrinsic = extrinsic
-        # vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
+            # extrinsic = \
+            #     np.array([[ 1.        ,  0.        ,  0.        ,  x],
+            #             [-0.        , -1.        , -0.        ,  0],
+            #             [-0.        , -0.        , -1.        ,  0],
+            #             [ 0.        ,  0.        ,  0.        ,  1.        ]])
 
-        # x -= 0.01
+            # pcam = o3d.camera.PinholeCameraParameters()
+            # pcam.intrinsic = intrinsic
+            # pcam.extrinsic = extrinsic
+            # vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
 
-        # import IPython; IPython.embed()
-        frame_no += 1
+            # x -= 0.01
 
-        # if not use_cache:
-        cv2.imshow("Depth", depth)
-        cv2.imshow("color", color)
-        key = cv2.waitKey(1)
-        if key  == ord('a'):
-            vis.stop_update()
+            # import IPython; IPython.embed()
+            frame_no += 1
+
+            # if not use_cache:
+            # import IPython; IPython.embed()
+            cv2.imshow("Depth", colorize2(depth))
+            cv2.imshow("color", color)
+            key = cv2.waitKey(1)
+            if key  == ord('a'):
+                vis.stop_update()
 
 
 if __name__ == '__main__':

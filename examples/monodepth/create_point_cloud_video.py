@@ -1,5 +1,6 @@
 import os
 from os.path import basename, join
+from remimi.utils.file import ensure_video
 import numpy as np
 import cv2
 
@@ -9,6 +10,7 @@ from remimi.sensors.webcamera import SimpleWebcamera
 from remimi.visualizers.point_cloud import SimplePointCloudVisualizer
 from remimi.utils.open3d import create_point_cloud_from_color_and_depth
 from remimi.sensors.paseudo_camera import DPTPaseudoDepthCamera, ImageType
+from remimi.sensors import StreamFinished
 import click
 
 import youtube_dl
@@ -20,19 +22,7 @@ import youtube_dl
 @click.option("--model-name", default="ken3d")
 def run(video_file, video_url, cache_root, model_name):
     if video_url is not None:
-        ydl_opts = {
-            "outtmpl": join(cache_root, "videos", "%(id)s.%(ext)s")
-        }
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            a = ydl.extract_info(video_url)
-            original_video_file = join(cache_root, "videos", f"{a['id']}.{a['ext']}")
-            video_file = join(cache_root, "videos", f"{a['id']}_res.mp4")
-            
-            if not os.path.exists(original_video_file):
-                original_video_file = join(cache_root, "videos", f"{a['id']}.mkv")
-
-            import subprocess
-            subprocess.run(f"ffmpeg -y -i {original_video_file} -s 640x480  {video_file}", shell=True, check=True)
+        video_file = ensure_video(video_url, cache_root)
 
     cache_folder = join(cache_root, basename(video_file))
     os.makedirs(cache_folder, exist_ok=True)
@@ -74,7 +64,11 @@ def run(video_file, video_url, cache_root, model_name):
     while True:
         suffix = str(frame_no).zfill(6)
 
-        color, depth = cam.get_color_and_depth()
+        try:
+            color, depth = cam.get_color_and_depth()
+        except StreamFinished:
+            print("Finished")
+            break
 
         # depth = depth.astype(np.uint16)
         cv2.imwrite(join(cache_folder, "{}_color.jpg".format(suffix)), color)
@@ -86,8 +80,12 @@ def run(video_file, video_url, cache_root, model_name):
         #                                         std_ratio=1.0)
         # np.save(join(cache_folder, "{}_outlier".format(suffix)), ind)
 
+        o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), pcd)
+
         # To see realsense input.
         # color, depth = sensor.get_color_and_depth()
+
+        print(f"{frame_no} processing.")
 
         frame_no += 1
 

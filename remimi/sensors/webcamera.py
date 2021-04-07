@@ -14,3 +14,6 @@ class SimpleWebcamera:
             raise StreamFinished()
 
         return frame
+
+    def get_fps(self):
+        return self.cap.get(cv2.CAP_PROP_FPS)

@@ -1,8 +1,11 @@
 import os
+from os.path import join
 import urllib.request
 
 import progressbar
 import urllib.request
+
+import youtube_dl
 
 
 pbar = None
@@ -31,3 +34,21 @@ def get_model_file(name, url):
         urllib.request.urlretrieve(url, filepath, show_progress)
 
     return filepath
+
+def ensure_video(video_url, cache_root):
+    ydl_opts = {
+        "outtmpl": join(cache_root, "videos", "%(id)s.%(ext)s")
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        a = ydl.extract_info(video_url)
+        original_video_file = join(cache_root, "videos", f"{a['id']}.{a['ext']}")
+        video_file = join(cache_root, "videos", f"{a['id']}_res.mp4")
+        
+        if not os.path.exists(original_video_file):
+            original_video_file = join(cache_root, "videos", f"{a['id']}.mkv")
+
+        import subprocess
+        if not os.path.exists(video_file):
+            subprocess.run(f"ffmpeg -y -i {original_video_file} -s 640x480  {video_file}", shell=True, check=True)
+
+    return video_file
