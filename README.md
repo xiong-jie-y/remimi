@@ -64,7 +64,7 @@ You can find classes from [here](https://github.com/open-mmlab/mmsegmentation/bl
 python examples/data_conversion/create_mask_image_dataset.py --input-file MOT17-02-FRCNN-raw.webm --output-folder test_imgs --class-names person
 ```
 
-### Dance Viewer
+### 3D Video Viewer
 You can watch the any videos in point cloud format. 
 To create point cloud video, please use this command and wait for around 30 minutes for 4 minutes video. It requires few GB of space for caching.
 
