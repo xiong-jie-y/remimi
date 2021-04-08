@@ -39,7 +39,7 @@ class DPTPaseudoDepthCamera:
         if model_name == "dpt":
             self.depth_estimator = DPTDepthEstimator(debug)
         elif model_name == "ken3d":
-            self.depth_estimator = Ken3DDepthEstimator()
+            self.depth_estimator = Ken3DDepthEstimator(debug=debug)
         # self.depth_estimator = InferenceHelper()
 
         self.sensor = sensor

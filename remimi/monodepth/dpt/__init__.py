@@ -40,6 +40,7 @@ class DPTDepthEstimator:
     def __init__(self, debug=False):
         optimize = True
         model_type="dpt_hybrid"
+        self.model_type = model_type
         default_models = {
             "midas_v21": "weights/midas_v21-f6b98070.pt",
             "dpt_large": "weights/dpt_large-midas-2f21e586.pt",
@@ -121,7 +122,7 @@ class DPTDepthEstimator:
         # self.cap = cv2.VideoCapture(camera_id)
         self.debug = debug
 
-    def estimate_depth(self, color):
+    def estimate_depth_raw(self, color):
         img_input = self.transform({"image": color})["image"]
 
         # compute
@@ -133,7 +134,17 @@ class DPTDepthEstimator:
                 sample = sample.half()
 
             prediction = self.model.forward(sample)
-            prediction = (
+            
+            return prediction
+            # if self.debug:
+            #     visualize_attention(sample, self.model, prediction, self.model_type)
+
+        return prediction
+
+    def estimate_depth(self, color):
+        prediction = self.estimate_depth_raw(color)
+
+        prediction = (
                 torch.nn.functional.interpolate(
                     prediction.unsqueeze(1),
                     size=color.shape[:2],
@@ -144,9 +155,6 @@ class DPTDepthEstimator:
                 .cpu()
                 .numpy()
             )
-
-            if self.debug:
-                visualize_attention(sample, self.model, prediction, args.model_type)
 
         # color = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         depth = get_inverse_map(prediction.astype(np.uint16))
