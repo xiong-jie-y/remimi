@@ -7,7 +7,7 @@ import cv2
 import open3d as o3d
 from remimi.sensors.realsense import RealsenseD435i
 from remimi.sensors.webcamera import SimpleWebcamera
-from remimi.visualizers.point_cloud import SimplePointCloudVisualizer
+from remimi.visualizers.point_cloud import SimplePointCloudVisualizer, StereoImageVisualizer
 from remimi.utils.open3d import create_point_cloud_from_color_and_depth
 from remimi.sensors.paseudo_camera import DPTPaseudoDepthCamera, ImageType
 from remimi.sensors import StreamFinished
@@ -15,13 +15,39 @@ import click
 
 import youtube_dl
 
+def create_anaglyph_func(left, right):
+    m = [ [ 0.299, 0.587, 0.114, 0, 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0, 0, 0.299, 0.587, 0.114 ] ]
+   #  m = [ [ 0.299, 0.587, 0.114, 0, 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0.299, 0.587, 0.114, 0.299, 0.587, 0.114 ] ]
+    # m = [ [ 1, 0, 0, 0, 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 1, 0, 0, 0, 1 ] ]
+    # m = [ [ 0.299, 0.587, 0.114, 0, 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 1, 0, 0, 0, 1 ] ]
+    m = [ [ 0, 0.7, 0.3, 0, 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 1, 0, 0, 0, 1 ] ]
+    width, height = left.size
+    leftMap = left.load()
+    rightMap = right.load()
+
+    for y in range(0, height):
+        for x in range(0, width):
+            r1, g1, b1 = leftMap[x, y]
+            r2, g2, b2 = rightMap[x, y]
+            leftMap[x, y] = (
+                int(r1*m[0][0] + g1*m[0][1] + b1*m[0][2] + r2*m[1][0] + g2*m[1][1] + b2*m[1][2]),
+                int(r1*m[0][3] + g1*m[0][4] + b1*m[0][5] + r2*m[1][3] + g2*m[1][4] + b2*m[1][5]),
+                int(r1*m[0][6] + g1*m[0][7] + b1*m[0][8] + r2*m[1][6] + g2*m[1][7] + b2*m[1][8])
+            )
+
+    return left
+
+from PIL import Image
+
 @click.command()
 @click.option("--video-file")
 @click.option("--video-url")
 @click.option("--cache-root")
 @click.option("--model-name", default="ken3d")
 @click.option("--save-point-cloud", is_flag=True)
-def run(video_file, video_url, cache_root, model_name, save_point_cloud):
+@click.option("--create-anaglyph", is_flag=True)
+@click.option("--debug", is_flag=True)
+def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, debug):
     if video_url is not None:
         video_file = ensure_video(video_url, cache_root)
 
@@ -50,11 +76,15 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud):
     # )
 
     cam = DPTPaseudoDepthCamera(
-        sensor, model_name, output_type=ImageType.RGB,boundary_depth_removal=False)
+        sensor, model_name, output_type=ImageType.RGB,boundary_depth_removal=False, debug=debug)
     vis = SimplePointCloudVisualizer(
         show_axis=False, original_coordinate=False
     )
+    # skip.
+    # for i in range(5150):
+    #     sensor.get_color()
 
+    
     vis.vis.get_render_option().point_size = 1
 
     import time
@@ -67,6 +97,7 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud):
 
         try:
             color, depth = cam.get_color_and_depth()
+            # depth *= 1000
         except StreamFinished:
             print("Finished")
             break
@@ -76,6 +107,16 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud):
         # cv2.imwrite(join(cache_folder, "{}_depth.png".format(str(frame_no).zfill(6))), depth)
         np.save(join(cache_folder, "{}_depth".format(suffix)), depth)
 
+
+        # color = cv2.imread(join(cache_folder, "{}_color.jpg".format(str(frame_no).zfill(6))))
+        # file2 = join(cache_folder, "{}_depth.png".format(suffix))
+
+        # if os.path.exists(file2):
+        #     depth = cv2.imread(file2, -1)
+        # else:
+        #     depth = np.load(join(cache_folder, "{}_depth.npy".format(suffix)))
+
+
         pcd = create_point_cloud_from_color_and_depth(color, depth, intrinsic)
         # _, ind = pcd.remove_statistical_outlier(nb_neighbors=20,
         #                                         std_ratio=1.0)
@@ -84,6 +125,58 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud):
         if save_point_cloud:
             o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), pcd)
 
+        if create_anaglyph:
+            baseline = 0.000015
+            # baseline = 0.00010
+            x = baseline
+            vis.update_by_pcd(pcd)
+            extrinsic = \
+                np.array([[ 1.        ,  0.        ,  0.        ,  x],
+                        [-0.        , -1.        , -0.        ,  0],
+                        [-0.        , -0.        , -1.        ,  0],
+                        [ 0.        ,  0.        ,  0.        ,  1.        ]])
+
+            pcam = o3d.camera.PinholeCameraParameters()
+            pcam.intrinsic = intrinsic
+            pcam.extrinsic = extrinsic
+            vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
+            # vis.update_by_pcd(pcd)
+
+            left_image = (np.array(vis.vis.capture_screen_float_buffer(False)) * 255).astype(np.uint8)
+            # import IPython; IPython.embed()
+            cv2.imshow("left", left_image)
+
+            vis.vis.poll_events()
+            vis.vis.update_renderer()
+            vis.vis.poll_events()
+            vis.vis.update_renderer()
+            # vis.update_by_pcd(pcd)
+            x = -baseline
+            # vis.update_by_pcd(pcd)
+            extrinsic = \
+                np.array([[ 1.        ,  0.        ,  0.        ,  x],
+                        [-0.        , -1.        , -0.        ,  0],
+                        [-0.        , -0.        , -1.        ,  0],
+                        [ 0.        ,  0.        ,  0.        ,  1.        ]])
+
+            pcam = o3d.camera.PinholeCameraParameters()
+            pcam.intrinsic = intrinsic
+            pcam.extrinsic = extrinsic
+            vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
+            # vis.update_by_pcd(pcd)
+
+            right_image = (np.array(vis.vis.capture_screen_float_buffer(False)) * 255).astype(np.uint8)
+            # import IPython; IPython.embed()
+            cv2.imshow("right", right_image)
+
+            ana_image = create_anaglyph_func(Image.fromarray(right_image), Image.fromarray(left_image))
+            # import IPython; IPython.embed()
+            ana_image_bgr = cv2.cvtColor(np.asarray(ana_image), cv2.COLOR_RGB2BGR)
+            cv2.imshow("anaglyph", ana_image_bgr)
+
+            cv2.imwrite(join(cache_folder, "{}_anaglyph.jpg".format(suffix)), ana_image_bgr)
+
+
         # To see realsense input.
         # color, depth = sensor.get_color_and_depth()
 
@@ -91,7 +184,7 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud):
 
         frame_no += 1
 
-        vis.update_by_pcd(pcd)
+        # vis.update_by_pcd(pcd)
 
         cv2.imshow("Depth", depth)
         cv2.imshow("color", color)

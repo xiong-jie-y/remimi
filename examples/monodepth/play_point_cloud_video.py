@@ -81,8 +81,9 @@ import youtube_dl
 @click.option("--video-file")
 @click.option("--video-url")
 @click.option("--cache-root")
+@click.option("--fix-scale", is_flag=True)
 @click.option("--model-name", default="ken3d")
-def run(video_file, video_url, cache_root, model_name):
+def run(video_file, video_url, cache_root, model_name, fix_scale):
     if video_url is not None:
         video_file = ensure_video(video_url, cache_root)
 
@@ -118,7 +119,7 @@ def run(video_file, video_url, cache_root, model_name):
     )
     # vis = InpaintedPointCloudVisualizer()
 
-    vis.vis.get_render_option().point_size = 2
+    vis.vis.get_render_option().point_size = 1
 
     from pydub import AudioSegment
     from pydub.playback import play
@@ -168,6 +169,9 @@ def run(video_file, video_url, cache_root, model_name):
                 else:
                     depth = np.load(join(cache_folder, "{}_depth.npy".format(suffix)))
 
+                anaglyph = cv2.imread(join(cache_folder, "{}_anaglyph.jpg".format(suffix)))
+                cv2.imshow("Anaglyph", anaglyph)
+
                 # depth = cv2.ximgproc.weightedMedianFilter(color, depth, 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
 
             # import IPython; IPython.embed()
@@ -186,8 +190,9 @@ def run(video_file, video_url, cache_root, model_name):
             # o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), inlier_cloud)
             # pcd = inlier_cloud
     
-            with time_logger.time_measure("fix_scale"):
-                scale_fixer.fix_scale(pcd)
+            if fix_scale:
+                with time_logger.time_measure("fix_scale"):
+                    scale_fixer.fix_scale(pcd)
 
             with time_logger.time_measure("update_by_pcd"):
                 vis.update_by_pcd(pcd)

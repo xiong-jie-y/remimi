@@ -93,7 +93,7 @@ class Ken3DDepthEstimator:
 
 		if self.raw_depth == "dpt":
 			# import IPython; IPython.embed()
-			npyDepth[npyDepth > 10] = 0
+			npyDepth[npyDepth > 100] = 0
 
 		# aa = pointcloud_inpainting(tenImage, tenDisparity, 100)
 		# aa['tenImage']
