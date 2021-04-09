@@ -1,5 +1,6 @@
 import os
 from os.path import basename, join
+from remimi.edit.hifill.hifill import MaskEliminator
 from remimi.utils.file import ensure_video
 import numpy as np
 import cv2
@@ -39,6 +40,16 @@ def create_anaglyph_func(left, right):
 
 from PIL import Image
 
+def create_mask(image):
+    mask = np.zeros((image.shape[0], image.shape[1]))
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    cv2.imshow("grayscale left", gray)
+    mask[gray != 255] = 255
+
+   #@  import IPython; IPython.embed()
+
+    return mask
+
 @click.command()
 @click.option("--video-file")
 @click.option("--video-url")
@@ -46,8 +57,9 @@ from PIL import Image
 @click.option("--model-name", default="ken3d")
 @click.option("--save-point-cloud", is_flag=True)
 @click.option("--create-anaglyph", is_flag=True)
+@click.option("--inpaint", is_flag=True)
 @click.option("--debug", is_flag=True)
-def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, debug):
+def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, debug, inpaint):
     if video_url is not None:
         video_file = ensure_video(video_url, cache_root)
 
@@ -75,6 +87,8 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
     #     1280, 720, 1500.0, 1500.0, 639.0, 359.25
     # )
 
+    eliminator = MaskEliminator()
+
     cam = DPTPaseudoDepthCamera(
         sensor, model_name, output_type=ImageType.RGB,boundary_depth_removal=False, debug=debug)
     vis = SimplePointCloudVisualizer(
@@ -85,7 +99,7 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
     #     sensor.get_color()
 
     
-    vis.vis.get_render_option().point_size = 1
+    vis.vis.get_render_option().point_size = 1.5
 
     import time
     x = 0
@@ -126,7 +140,9 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
             o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), pcd)
 
         if create_anaglyph:
+            # last adjustment
             baseline = 0.000015
+            # baseline = 0.000008
             # baseline = 0.00010
             x = baseline
             vis.update_by_pcd(pcd)
@@ -140,10 +156,26 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
             pcam.intrinsic = intrinsic
             pcam.extrinsic = extrinsic
             vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
+            vis.vis.get_view_control().set_constant_z_far(1000)
             # vis.update_by_pcd(pcd)
 
             left_image = (np.array(vis.vis.capture_screen_float_buffer(False)) * 255).astype(np.uint8)
-            # import IPython; IPython.embed()
+            if inpaint:
+                # import IPython; IPython.embed()
+                left_image_mask = create_mask(left_image).astype(np.uint8)
+                kernel = np.ones((5,5),np.uint8)
+                left_image_mask = cv2.erode(left_image_mask,kernel,iterations = 1)
+                # import IPython; IPython.embed()
+                cv2.imshow("left inpaint mask", left_image_mask)
+                mask = cv2.cvtColor(left_image_mask, cv2.COLOR_GRAY2BGR)
+                left_inpainted_image = eliminator.eliminate_by_mask(cv2.cvtColor(left_image, cv2.COLOR_RGB2BGR), mask)
+                left_image = cv2.cvtColor(left_inpainted_image, cv2.COLOR_BGR2RGB)
+            # left_image_r = cv2.ximgproc.weightedMedianFilter(left_image, left_image[:, :, 0], 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
+            # left_image_g = cv2.ximgproc.weightedMedianFilter(left_image, left_image[:, :, 1], 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
+            # left_image_b = cv2.ximgproc.weightedMedianFilter(left_image, left_image[:, :, 2], 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
+            # left_image = np.stack((left_image_r, left_image_g, left_image_b), axis=2)
+            # left_image = cv2.medianBlur(left_image,5)
+            cv2.imwrite(join(cache_folder, "{}_left.png".format(suffix)), left_image)
             cv2.imshow("left", left_image)
 
             vis.vis.poll_events()
@@ -163,10 +195,19 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
             pcam.intrinsic = intrinsic
             pcam.extrinsic = extrinsic
             vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
+            vis.vis.get_view_control().set_constant_z_far(1000)
             # vis.update_by_pcd(pcd)
 
             right_image = (np.array(vis.vis.capture_screen_float_buffer(False)) * 255).astype(np.uint8)
-            # import IPython; IPython.embed()
+            if inpaint:
+                right_image_mask = create_mask(right_image).astype(np.uint8)
+                kernel = np.ones((5,5),np.uint8)
+                right_image_mask = cv2.erode(right_image_mask,kernel,iterations = 2)
+                # # import IPython; IPython.embed()
+                mask = cv2.cvtColor(right_image_mask, cv2.COLOR_GRAY2BGR)
+                right_inpainted_image = eliminator.eliminate_by_mask(cv2.cvtColor(right_image, cv2.COLOR_RGB2BGR), mask)
+                right_image = right_inpainted_image
+                right_image = cv2.cvtColor(right_inpainted_image, cv2.COLOR_BGR2RGB)
             cv2.imshow("right", right_image)
 
             ana_image = create_anaglyph_func(Image.fromarray(right_image), Image.fromarray(left_image))
