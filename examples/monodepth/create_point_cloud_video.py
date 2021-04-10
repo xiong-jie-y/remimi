@@ -38,6 +38,21 @@ def create_anaglyph_func(left, right):
 
     return left
 
+def make_stereopair(left, right):
+    width, height = left.size
+    leftMap = left.load()
+    rightMap = right.load()
+    pair = Image.new('RGB', (width * 2, height))
+    pairMap = pair.load()
+    for y in range(0, height):
+        for x in range(0, width):
+            pairMap[x, y] = leftMap[x, y]
+            pairMap[x + width, y] = rightMap[x, y]
+    # if color == 'mono':
+    #     pair = pair.convert('L')
+    return pair
+
+
 from PIL import Image
 
 def create_mask(image):
@@ -57,9 +72,10 @@ def create_mask(image):
 @click.option("--model-name", default="ken3d")
 @click.option("--save-point-cloud", is_flag=True)
 @click.option("--create-anaglyph", is_flag=True)
+@click.option("--create-stereo-pair", is_flag=True)
 @click.option("--inpaint", is_flag=True)
 @click.option("--debug", is_flag=True)
-def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, debug, inpaint):
+def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, create_stereo_pair, debug, inpaint):
     if video_url is not None:
         video_file = ensure_video(video_url, cache_root)
 
@@ -200,6 +216,7 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
 
             right_image = (np.array(vis.vis.capture_screen_float_buffer(False)) * 255).astype(np.uint8)
             if inpaint:
+                print("inpainting")
                 right_image_mask = create_mask(right_image).astype(np.uint8)
                 kernel = np.ones((5,5),np.uint8)
                 right_image_mask = cv2.erode(right_image_mask,kernel,iterations = 2)
@@ -216,6 +233,13 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
             cv2.imshow("anaglyph", ana_image_bgr)
 
             cv2.imwrite(join(cache_folder, "{}_anaglyph.jpg".format(suffix)), ana_image_bgr)
+
+            stereo_image = make_stereopair(Image.fromarray(left_image), Image.fromarray(right_image))
+            # import IPython; IPython.embed()
+            stereo_image_bgr = cv2.cvtColor(np.asarray(stereo_image), cv2.COLOR_RGB2BGR)
+            cv2.imshow("stereo pair", stereo_image_bgr)
+
+            cv2.imwrite(join(cache_folder, "{}_stereo.jpg".format(suffix)), stereo_image_bgr)
 
 
         # To see realsense input.
