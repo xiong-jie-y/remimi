@@ -1,5 +1,6 @@
 import os
 from os.path import basename, join
+from remimi.sensors.file import MultipleImageStream
 from remimi.edit.hifill.hifill import MaskEliminator
 from remimi.utils.file import ensure_video
 import numpy as np
@@ -67,6 +68,7 @@ def create_mask(image):
 
 @click.command()
 @click.option("--video-file")
+@click.option("--image-file")
 @click.option("--video-url")
 @click.option("--cache-root")
 @click.option("--model-name", default="ken3d")
@@ -75,20 +77,33 @@ def create_mask(image):
 @click.option("--create-stereo-pair", is_flag=True)
 @click.option("--inpaint", is_flag=True)
 @click.option("--debug", is_flag=True)
-def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, create_stereo_pair, debug, inpaint):
+def run(video_file, image_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, create_stereo_pair, debug, inpaint):
     if video_url is not None:
         video_file = ensure_video(video_url, cache_root)
 
-    cache_folder = join(cache_root, basename(video_file))
+    if video_file is not None:
+        cache_folder = join(cache_root, basename(video_file))
+    elif image_file is not None:
+        cache_folder = join(cache_root, "images")
     os.makedirs(cache_folder, exist_ok=True)
 
     if video_file is not None:
         sensor = SimpleWebcamera(video_file)
+    elif image_file is not None:
+        sensor = MultipleImageStream([image_file])
     else:
         sensor = SimpleWebcamera(webcam_id)
+    
+    base_center_x = 319.5 / 640
+    base_center_y = 239.5 / 480
+
+    width = 768
+    height = 576
+
     intrinsic = o3d.camera.PinholeCameraIntrinsic(
         # o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
-        640, 480, 1000.0, 1000.0, 319.5, 239.5
+        width, height, 1000.0, 1000.0, width / 2 - 0.5, height / 2 - 0.5
+        # width, height, 4000.0, 4000.0, width / 2 - 0.5, height / 2 - 0.5
     )
     # intrinsic = o3d.camera.PinholeCameraIntrinsic(
     #     # o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
@@ -107,7 +122,7 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
 
     cam = DPTPaseudoDepthCamera(
         sensor, model_name, output_type=ImageType.RGB,boundary_depth_removal=False, debug=debug)
-    vis = SimplePointCloudVisualizer(
+    vis = SimplePointCloudVisualizer((width, height),
         show_axis=False, original_coordinate=False
     )
     # skip.
@@ -157,11 +172,14 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
 
         if create_anaglyph:
             # last adjustment
+            # For Dance
             baseline = 0.000015
+            # baseline = 0.001
             # baseline = 0.000008
             # baseline = 0.00010
             x = baseline
             vis.update_by_pcd(pcd)
+            
             extrinsic = \
                 np.array([[ 1.        ,  0.        ,  0.        ,  x],
                         [-0.        , -1.        , -0.        ,  0],
@@ -172,15 +190,20 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
             pcam.intrinsic = intrinsic
             pcam.extrinsic = extrinsic
             vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
-            vis.vis.get_view_control().set_constant_z_far(1000)
+            vis.vis.get_view_control().set_constant_z_far(10000000)
+            vis.vis.get_view_control().set_constant_z_near(-10000000)
             # vis.update_by_pcd(pcd)
+            vis.vis.poll_events()
+            vis.vis.update_renderer()
+
+            # import IPython; IPython.embed()
 
             left_image = (np.array(vis.vis.capture_screen_float_buffer(False)) * 255).astype(np.uint8)
             if inpaint:
                 # import IPython; IPython.embed()
                 left_image_mask = create_mask(left_image).astype(np.uint8)
                 kernel = np.ones((5,5),np.uint8)
-                left_image_mask = cv2.erode(left_image_mask,kernel,iterations = 1)
+                # left_image_mask = cv2.erode(left_image_mask,kernel,iterations = 1)
                 # import IPython; IPython.embed()
                 cv2.imshow("left inpaint mask", left_image_mask)
                 mask = cv2.cvtColor(left_image_mask, cv2.COLOR_GRAY2BGR)
@@ -194,10 +217,6 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
             cv2.imwrite(join(cache_folder, "{}_left.png".format(suffix)), left_image)
             cv2.imshow("left", left_image)
 
-            vis.vis.poll_events()
-            vis.vis.update_renderer()
-            vis.vis.poll_events()
-            vis.vis.update_renderer()
             # vis.update_by_pcd(pcd)
             x = -baseline
             # vis.update_by_pcd(pcd)
@@ -211,15 +230,19 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
             pcam.intrinsic = intrinsic
             pcam.extrinsic = extrinsic
             vis.vis.get_view_control().convert_from_pinhole_camera_parameters(pcam)
-            vis.vis.get_view_control().set_constant_z_far(1000)
+            vis.vis.get_view_control().set_constant_z_far(10000000)
+            vis.vis.get_view_control().set_constant_z_near(0)
             # vis.update_by_pcd(pcd)
+
+            vis.vis.poll_events()
+            vis.vis.update_renderer()
 
             right_image = (np.array(vis.vis.capture_screen_float_buffer(False)) * 255).astype(np.uint8)
             if inpaint:
                 print("inpainting")
                 right_image_mask = create_mask(right_image).astype(np.uint8)
                 kernel = np.ones((5,5),np.uint8)
-                right_image_mask = cv2.erode(right_image_mask,kernel,iterations = 2)
+                # right_image_mask = cv2.erode(right_image_mask,kernel,iterations = 2)
                 # # import IPython; IPython.embed()
                 mask = cv2.cvtColor(right_image_mask, cv2.COLOR_GRAY2BGR)
                 right_inpainted_image = eliminator.eliminate_by_mask(cv2.cvtColor(right_image, cv2.COLOR_RGB2BGR), mask)
@@ -227,14 +250,14 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
                 right_image = cv2.cvtColor(right_inpainted_image, cv2.COLOR_BGR2RGB)
             cv2.imshow("right", right_image)
 
-            ana_image = create_anaglyph_func(Image.fromarray(right_image), Image.fromarray(left_image))
+            ana_image = create_anaglyph_func(Image.fromarray(left_image), Image.fromarray(right_image))
             # import IPython; IPython.embed()
             ana_image_bgr = cv2.cvtColor(np.asarray(ana_image), cv2.COLOR_RGB2BGR)
             cv2.imshow("anaglyph", ana_image_bgr)
 
             cv2.imwrite(join(cache_folder, "{}_anaglyph.jpg".format(suffix)), ana_image_bgr)
 
-            stereo_image = make_stereopair(Image.fromarray(left_image), Image.fromarray(right_image))
+            stereo_image = make_stereopair(Image.fromarray(right_image), Image.fromarray(left_image))
             # import IPython; IPython.embed()
             stereo_image_bgr = cv2.cvtColor(np.asarray(stereo_image), cv2.COLOR_RGB2BGR)
             cv2.imshow("stereo pair", stereo_image_bgr)
@@ -254,6 +277,14 @@ def run(video_file, video_url, cache_root, model_name, save_point_cloud, create_
         cv2.imshow("Depth", depth)
         cv2.imshow("color", color)
         key = cv2.waitKey(1)
+        # 
+        # vis.update_by_pcd(pcd)
+        # while True:
+        #     vis.vis.poll_events()
+        #     vis.vis.update_renderer()
+        #     cv2.imshow("Depth", depth)
+        #     cv2.imshow("color", color)
+        #     key = cv2.waitKey(1)
         if key  == ord('a'):
             vis.stop_update()
 
