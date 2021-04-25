@@ -44,7 +44,7 @@ objCommon = {}
 
 exec(open('remimi/monodepth/ken3d/common.py', 'r').read())
 
-# exec(open('remimi/monodepth/ken3d/disparity-estimation.py', 'r').read())
+exec(open('remimi/monodepth/ken3d/disparity-estimation.py', 'r').read())
 exec(open('remimi/monodepth/ken3d/disparity-adjustment.py', 'r').read())
 exec(open('remimi/monodepth/ken3d/disparity-refinement.py', 'r').read())
 # exec(open('remimi/monodepth/ken3d/pointcloud-inpainting.py', 'r').read())
@@ -65,13 +65,13 @@ class Ken3DDepthEstimator:
 		if self.raw_depth == "dpt":
 			tenDisparity = self.raw_depth_estimator.estimate_depth_raw(npyImage).type(torch.cuda.FloatTensor)
 			tenDisparity = tenDisparity.unsqueeze(1)
-			tenDisparity = torch.nn.functional.interpolate(input=tenDisparity, size=(tenDisparity.shape[2] //2, tenDisparity.shape[3] // 2), mode='bilinear', align_corners=False)
+			# tenDisparity = torch.nn.functional.interpolate(input=tenDisparity, size=(tenDisparity.shape[2], tenDisparity.shape[3]), mode='bilinear', align_corners=False)
 
 		# import IPython; IPython.embed()
 		tenImage = torch.FloatTensor(numpy.ascontiguousarray(npyImage.transpose(2, 0, 1)[None, :, :, :].astype(numpy.float32) * (1.0 / 255.0))).cuda()
 		if self.raw_depth != "dpt":
 			tenDisparity = disparity_estimation(tenImage)
-		#import IPython; IPython.embed()
+		# import IPython; IPython.embed()
 		if self.debug:
 				cv2.imshow("Raw Depth", colorize2(tenDisparity[0, 0, :, :].cpu().numpy().astype(numpy.float32)))
 
@@ -83,7 +83,7 @@ class Ken3DDepthEstimator:
 				except:
 					import IPython; IPython.embed()
 		if self.refinement:
-			tenDisparity = disparity_refinement(torch.nn.functional.interpolate(input=tenImage, size=(tenDisparity.shape[2] * 4, tenDisparity.shape[3] * 4), mode='bilinear', align_corners=False), tenDisparity)
+			tenDisparity = disparity_refinement(torch.nn.functional.interpolate(input=tenImage, size=(tenDisparity.shape[2] * 2, tenDisparity.shape[3] * 2), mode='bilinear', align_corners=False), tenDisparity)
 
 		tenDisparity = torch.nn.functional.interpolate(input=tenDisparity, size=(tenImage.shape[2], tenImage.shape[3]), mode='bilinear', align_corners=False) * (max(tenImage.shape[2], tenImage.shape[3]) / 256.0)
 		tenDepth = (fltFocal * fltBaseline) / (tenDisparity + 0.0000001)
@@ -93,7 +93,14 @@ class Ken3DDepthEstimator:
 
 		if self.raw_depth == "dpt":
 			# import IPython; IPython.embed()
-			npyDepth[npyDepth > 100] = 0
+			# npyDepth[npyDepth > 400] = 100
+			# For ordinary distance.
+			# npyDepth[npyDepth > 7] = 0
+			# For close distance.
+			npyDepth[npyDepth > 200] = 200
+
+			pass
+
 
 		# aa = pointcloud_inpainting(tenImage, tenDisparity, 100)
 		# aa['tenImage']
