@@ -35,17 +35,18 @@ def show_image_blocking(image, **imshow_arg):
     plt.show()
 
 class DPTPaseudoDepthCamera:
-    def __init__(self, sensor, model_name: str, debug=False, output_type=ImageType.RGB, boundary_depth_removal=False):
-        if model_name == "dpt":
-            self.depth_estimator = DPTDepthEstimator(debug)
-        elif model_name == "ken3d":
-            self.depth_estimator = Ken3DDepthEstimator(debug=debug)
+    def __init__(self, sensor, depth_estimator, model_name: str, debug=False, output_type=ImageType.RGB, boundary_depth_removal=False):
+        # if model_name == "dpt":
+        #     self.depth_estimator = DPTDepthEstimator(debug)
+        # elif model_name == "ken3d":
+        #     self.depth_estimator = Ken3DDepthEstimator(debug=debug)
+        self.depth_estimator = depth_estimator
         # self.depth_estimator = InferenceHelper()
 
         self.sensor = sensor
         self.output_type = output_type
         self.boundary_depth_removal = boundary_depth_removal
-        self.semantic_segmentater = SemanticSegmenter()
+        # self.semantic_segmentater = semantic_segmenter
 
     def get_color_and_depth(self):
         color = self.sensor.get_color()

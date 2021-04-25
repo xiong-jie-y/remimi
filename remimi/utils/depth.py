@@ -17,5 +17,6 @@ def colorize(
 
 def colorize2(image):
     depth = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-    depth = cv2.applyColorMap(depth, cv2.COLORMAP_MAGMA)
+    # depth = cv2.applyColorMap(depth, cv2.COLORMAP_MAGMA)
+    depth = cv2.applyColorMap(depth, cv2.COLORMAP_TURBO)
     return depth

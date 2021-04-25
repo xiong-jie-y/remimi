@@ -1,5 +1,9 @@
+import glob
 import os
 from os.path import basename, join
+from remimi.monodepth.ken3d.depthestim import Ken3DDepthEstimator
+from remimi.detection.instance_segmentation import InstanceSegmenter
+from remimi.utils.depth import colorize2
 from remimi.sensors.file import MultipleImageStream
 from remimi.edit.hifill.hifill import MaskEliminator
 from remimi.utils.file import ensure_video
@@ -60,7 +64,7 @@ def create_mask(image):
     mask = np.zeros((image.shape[0], image.shape[1]))
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     cv2.imshow("grayscale left", gray)
-    mask[gray != 255] = 255
+    mask[gray != 0] = 255
 
    #@  import IPython; IPython.embed()
 
@@ -71,11 +75,14 @@ from remimi.utils.logging import PerfLogger
 def create_parallaxed_image(pcd, vis, intrinsic, inpaint, eliminator, cache_folder, suffix, name, parallax):
     logger = PerfLogger(print=False)
 
+    # For a without backgrond fix.
+    # closer_distance = -0.00005
+    closer_distance = -0.0001
     with logger.time_measure("camera"):
         extrinsic = \
             np.array([[ 1.        ,  0.        ,  0.        ,  parallax],
                     [-0.        , -1.        , -0.        ,  0],
-                    [-0.        , -0.        , -1.        ,  -0.0001],
+                    [-0.        , -0.        , -1.        ,  closer_distance],
                     [ 0.        ,  0.        ,  0.        ,  1.        ]])
 
         pcam = o3d.camera.PinholeCameraParameters()
@@ -139,7 +146,9 @@ def gallery(images, ncols=3):
 
 @click.command()
 @click.option("--video-file")
+@click.option("--background-video-file")
 @click.option("--image-file")
+@click.option("--mask-dir")
 @click.option("--video-url")
 @click.option("--cache-root")
 @click.option("--model-name", default="ken3d")
@@ -149,7 +158,7 @@ def gallery(images, ncols=3):
 @click.option("--create-looking-glass", is_flag=True)
 @click.option("--inpaint", is_flag=True)
 @click.option("--debug", is_flag=True)
-def run(video_file, image_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, create_stereo_pair, debug, inpaint, create_looking_glass):
+def run(video_file, background_video_file, mask_dir, image_file, video_url, cache_root, model_name, save_point_cloud, create_anaglyph, create_stereo_pair, debug, inpaint, create_looking_glass):
     if video_url is not None:
         video_file = ensure_video(video_url, cache_root)
 
@@ -159,10 +168,16 @@ def run(video_file, image_file, video_url, cache_root, model_name, save_point_cl
         cache_folder = join(cache_root, "images")
     os.makedirs(cache_folder, exist_ok=True)
 
+    background_video_stream = None
     if video_file is not None:
         sensor = SimpleWebcamera(video_file)
         # width, height = 1280, 720
         width, height = 640, 480
+        background_video_stream = SimpleWebcamera(background_video_file)
+        mask_stream = SimpleWebcamera(mask_dir)
+        # aaa = sorted(list(glob.glob(join(mask_dir, "*.png"))))
+        # # print(aaa)
+        # mask_stream = MultipleImageStream(aaa)
     elif image_file is not None:
         sensor = MultipleImageStream([image_file])
         height, width, _ = cv2.imread(image_file).shape
@@ -174,7 +189,7 @@ def run(video_file, image_file, video_url, cache_root, model_name, save_point_cl
 
     intrinsic = o3d.camera.PinholeCameraIntrinsic(
         # o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
-        width, height, 1000.0, 1000.0, width / 2 - 0.5, height / 2 - 0.5
+        width, height, 2000.0, 2000.0, width / 2 - 0.5, height / 2 - 0.5
         # width, height, 4000.0, 4000.0, width / 2 - 0.5, height / 2 - 0.5
     )
     # intrinsic = o3d.camera.PinholeCameraIntrinsic(
@@ -192,40 +207,62 @@ def run(video_file, image_file, video_url, cache_root, model_name, save_point_cl
 
     eliminator = MaskEliminator()
 
+    # semantic_segmentater = SemanticSegmenter
+    depth_estimator = Ken3DDepthEstimator(debug=debug)
+
     cam = DPTPaseudoDepthCamera(
-        sensor, model_name, output_type=ImageType.RGB,boundary_depth_removal=False, debug=debug)
+        sensor, depth_estimator, model_name, output_type=ImageType.RGB,boundary_depth_removal=False, debug=debug)
+    background_depth_video_stream = DPTPaseudoDepthCamera(
+        background_video_stream, depth_estimator, model_name, output_type=ImageType.RGB,boundary_depth_removal=False, debug=debug)
+    # mask_a_stream = DPTPaseudoDepthCamera(
+    #     mask_stream, depth_estimator, model_name, output_type=ImageType.RGB,boundary_depth_removal=False, debug=debug)
+
     vis = SimplePointCloudVisualizer((width, height),
         show_axis=False, original_coordinate=False
     )
-    vis2 = SimplePointCloudVisualizer((width, height),
-        show_axis=False, original_coordinate=False
-    )
+    # vis2 = SimplePointCloudVisualizer((width, height),
+    #     show_axis=False, original_coordinate=False
+    # )
 
     #time_logger = PerfLogger(print=True)
 
     vis.vis.get_render_option().background_color = np.array([0,0,0])
     # skip.
-    # for i in range(5150):
+    # for i in range(5000):
     #     sensor.get_color()
+    #     background_video_stream.get_color()
+    #     mask_stream.get_color()
 
     time_logger = PerfLogger(print=False)
     
     vis.vis.get_render_option().point_size = 1.5
+
 
     import time
     x = 0
     frame_no = 0
     print("start processing")
     last_time = time.time() - 100
+    finished = False
     while True:
+        if finished:
+            cv2.waitKey(1)
+            vis.vis.poll_events()
+            vis.vis.update_renderer()
+            continue
         suffix = str(frame_no).zfill(6)
 
         try:
             color, depth = cam.get_color_and_depth()
+            color_bg, depth_bg = background_depth_video_stream.get_color_and_depth()
+            human_mask = mask_stream.get_color()
             # depth *= 1000
         except StreamFinished:
             print("Finished")
-            break
+            finished = True
+            import sys
+            # sys.exit(0)
+            continue
 
         # depth = depth.astype(np.uint16)
         cv2.imwrite(join(cache_folder, "{}_color.jpg".format(suffix)), color)
@@ -241,24 +278,49 @@ def run(video_file, image_file, video_url, cache_root, model_name, save_point_cl
         # else:
         #     depth = np.load(join(cache_folder, "{}_depth.npy".format(suffix)))
 
+        # import IPython; IPython.embed()
 
+        human_mask = cv2.cvtColor(human_mask, cv2.COLOR_RGB2GRAY)
+        depth[human_mask < 125] = 0
+        cv2.imshow("human mask", human_mask)
         pcd = create_point_cloud_from_color_and_depth(color, depth, intrinsic)
-        # _, ind = pcd.remove_statistical_outlier(nb_neighbors=20,
-        #                                         std_ratio=1.0)
+        pcd2 = create_point_cloud_from_color_and_depth(color_bg, depth_bg, intrinsic)
+        _, ind = pcd.remove_statistical_outlier(nb_neighbors=30,
+                                                std_ratio=1.0)
+        pcd = pcd.select_by_index(ind)
+
+        # person_points = []
+        # person_colors = []
+        # original_points = np.array(pcd.points)
+        # original_colors = np.array(pcd.colors)
+        # for i in range(0, 10):
+        #     copy_points = original_points.copy()
+        #     copy_points[:, 2] += i * 0.00001
+        #     person_points.append(copy_points)
+        #     person_colors.append(original_colors)
+
+        # pcd.points = o3d.utility.Vector3dVector(np.concatenate(person_points, axis=0))
+        # pcd.colors = o3d.utility.Vector3dVector(np.concatenate(person_colors, axis=0))
+        
         # np.save(join(cache_folder, "{}_outlier".format(suffix)), ind)
 
         if save_point_cloud:
             o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), pcd)
 
+        with time_logger.time_measure("update PCD"):
+            vis.update_by_pcd([pcd, pcd2])
+
+
         if create_anaglyph:
             # last adjustment
             # For Dance
             baseline = 0.000015
+            # For Ghibli
+            baseline = 0.000020
             # baseline = 0.001
             # baseline = 0.000008
             # baseline = 0.00010
 
-            vis.update_by_pcd(pcd)
             left_image = create_parallaxed_image(pcd, vis, intrinsic, inpaint, eliminator, cache_folder, suffix, "left", baseline)
             right_image = create_parallaxed_image(pcd, vis, intrinsic, inpaint, eliminator, cache_folder, suffix, "right", -baseline)
 
@@ -282,7 +344,9 @@ def run(video_file, image_file, video_url, cache_root, model_name, save_point_cl
             # baseline = 0.000015
             # For looking glass
             # A bit thin.
-            baseline = 0.000007
+            # baseline = 0.000005
+            # For 2000.
+            baseline = 0.0000025
             # Closeer camera.
             # baseline = 0.000010
             # baseline = 0.0000017
@@ -291,9 +355,6 @@ def run(video_file, image_file, video_url, cache_root, model_name, save_point_cl
             # baseline = 0.001
             # baseline = 0.000008
             # baseline = 0.00010
-
-            with time_logger.time_measure("update PCD"):
-                vis.update_by_pcd(pcd)        
 
             with time_logger.time_measure("create_parallax"):
                 left_images = [
@@ -325,7 +386,7 @@ def run(video_file, image_file, video_url, cache_root, model_name, save_point_cl
 
         # vis.update_by_pcd(pcd)
 
-        cv2.imshow("Depth", depth)
+        cv2.imshow("Depth", colorize2(depth))
         cv2.imshow("color", color)
         key = cv2.waitKey(1)
         # 

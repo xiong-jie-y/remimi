@@ -5,32 +5,34 @@ import numpy as np
 import open3d as o3d
 
 class SimplePointCloudVisualizer:
-    def __init__(self, show_axis=False, original_coordinate=False):
+    def __init__(self, size, show_axis=False, original_coordinate=False):
         vis = o3d.visualization.Visualizer()
-        vis.create_window(width=640, height=480)
+        vis.create_window(width=size[0], height=size[1])
         self.vis = vis
         self.original_coordinate = original_coordinate
         
         if show_axis:
             self.coord = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.6, origin=[0,0,0])
             vis.add_geometry(self.coord)
-        self.pcd = o3d.geometry.PointCloud()
+        self.pcds = [o3d.geometry.PointCloud() for _ in range(2)]
 
         self.frame_count = 0
         self.flip_transform = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]
 
         self.stop = False
 
-    def update_by_pcd(self, temp):
-        if not self.original_coordinate:
-            temp.transform(self.flip_transform)
-        self.pcd.points = temp.points
-        self.pcd.colors = temp.colors
-        if self.frame_count == 0:
-            self.vis.add_geometry(self.pcd)
+    def update_by_pcd(self, pcds):
+        for i, pcd in enumerate(pcds):
+            if not self.original_coordinate:
+                pcd.transform(self.flip_transform)
+            self.pcds[i].points = pcd.points
+            self.pcds[i].colors = pcd.colors
+            if self.frame_count == 0:
+                self.vis.add_geometry(self.pcds[i])
 
-        if not self.stop:
-            self.vis.update_geometry(self.pcd)
+            if not self.stop:
+                self.vis.update_geometry(self.pcds[i])
+    
         self.vis.poll_events()
         self.vis.update_renderer()
 
@@ -64,3 +66,13 @@ class InpaintedPointCloudVisualizer(SimplePointCloudVisualizer):
         mask = cv2.cvtColor(aa, cv2.COLOR_GRAY2BGR)
         inpainted_image = self.eliminator.eliminate_by_mask(cv2.cvtColor(image, cv2.COLOR_RGB2BGR), mask)
         cv2.imshow("inpainted", inpainted_image)
+
+class StereoImageVisualizer(SimplePointCloudVisualizer):
+    def __init__(self):
+        super().__init__()
+
+    def update_by_pcd(self, pcd):
+        super().update_by_pcd(pcd)
+
+        image = np.array(self.vis.capture_screen_float_buffer(False)) * 255
+        cv2.imshow("inpainted", image)

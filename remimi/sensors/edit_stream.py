@@ -27,11 +27,14 @@ class HumanEliminatedStream:
 
         return self.eliminator.eliminate_by_mask(color, cv2.cvtColor(color2, cv2.COLOR_GRAY2BGR))
 
+OUTPUT_SIZE = (819, 455)
+
 class SaveMaskAndFrameSink:
     def __init__(self, stream, output_root, class_names, margin):
         self.stream = stream
         os.makedirs(join(output_root, "masks"), exist_ok=True)
         os.makedirs(join(output_root, "frames"), exist_ok=True)
+        os.makedirs(join(output_root, "originals"), exist_ok=True)
         self.frame_count = 0
         
         # self.semantic_segmentater = SemanticSegmenter()
@@ -43,10 +46,21 @@ class SaveMaskAndFrameSink:
     def process(self, show=False):
         filename = str(self.frame_count).zfill(5)
         color = self.stream.get_color()
-        if show:
-            cv2.imshow("Original", color)
-        cv2.imwrite(join(self.output_root, "frames/{}.jpg".format(filename)), color)
+        color_small = cv2.resize(color, OUTPUT_SIZE)
+        color_medium = cv2.resize(color, (1280, 720))
+        # color_upper = cv2.resize(color, (1280, 720))
+        cv2.imwrite(join(self.output_root, "originals/{}.jpg".format(filename)), color, [cv2.IMWRITE_JPEG_QUALITY, 100])
+        cv2.imwrite(join(self.output_root, "frames/{}.jpg".format(filename)), color_small, [cv2.IMWRITE_JPEG_QUALITY, 100])
+        cv2.imwrite(join(self.output_root, "originals/medium{}.png".format(filename)), color_medium)
+        cv2.imshow("Original Image", color_small)
 
+        # color = color_upper
+
+        color_yuv = cv2.cvtColor(color, cv2.COLOR_BGR2YUV)
+        color_yuv[:,:,0] = cv2.equalizeHist(color_yuv[:,:,0])
+        color = cv2.cvtColor(color_yuv, cv2.COLOR_YUV2BGR)
+
+        # color = cv2.resize(color, (1280, 720))
         color2 = self.semantic_segmentater.get_mask(color, self.class_names)
 
         if self.margin < 0:
@@ -58,7 +72,14 @@ class SaveMaskAndFrameSink:
 
         white_mask = np.zeros(color2.shape, dtype=np.uint8)
         white_mask[color2 == 0] = 255
+        white_mask = cv2.resize(white_mask, OUTPUT_SIZE)
+        white_mask[white_mask > 128] = 255
         white_mask = cv2.cvtColor(white_mask, cv2.COLOR_GRAY2RGB)
+
+        if show:
+            color_image_bgr = cv2.addWeighted(color, 0.5, cv2.cvtColor(color2, cv2.COLOR_GRAY2BGR), 0.5, 0)
+            cv2.imshow("Original", color_image_bgr)
+
         if show:
             cv2.imshow("Mask", white_mask)
         cv2.imwrite(join(self.output_root, "masks/{}.png".format(filename)), white_mask)
