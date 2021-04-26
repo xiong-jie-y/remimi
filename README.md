@@ -76,7 +76,7 @@ You can just generate quilt video by using this command.
 `--video-url` is the url of the video from which quilt video is generated.
 You can add `--video-file` to indicate the location of the any video file instad of `--video-url`.
 
-IT WILL TAKE MORE THAN HOURS :D
+IT WILL TAKE MORE THAN 1 HOURS, and RTX 3070, 2070 or similar GPU's are recommended.
 
 ```bash
 python examples/monodepth/create_point_cloud_video.py --video-url ${VIDEO_URL} --cache-root ${CACHE_ROOT} --output-path ${OUTPUT_PATH} --create-looking-glass
