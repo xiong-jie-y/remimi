@@ -7,8 +7,6 @@ Feel free to post issue and PR when you find problem or new feature.
 Everything is tested on Ubuntu 20.04.
 Most of the script requires GPU.
 
-Please install pytorch, opencv (>4).
-
 ### Conda Environment
 I recommend using environment management tool.
 This is the example of using [conda](https://docs.conda.io/en/latest/miniconda.html).
