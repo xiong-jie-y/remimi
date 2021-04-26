@@ -172,7 +172,7 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
     if video_file is not None:
         sensor = SimpleWebcamera(video_file)
         # width, height = 1280, 720
-        width, height = 640, 480
+        width, height = 820, 460
         background_video_stream = SimpleWebcamera(background_video_file)
         mask_stream = SimpleWebcamera(mask_dir)
         # aaa = sorted(list(glob.glob(join(mask_dir, "*.png"))))
@@ -228,7 +228,7 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
 
     vis.vis.get_render_option().background_color = np.array([0,0,0])
     # skip.
-    # for i in range(5000):
+    # for i in range(500):
     #     sensor.get_color()
     #     background_video_stream.get_color()
     #     mask_stream.get_color()
