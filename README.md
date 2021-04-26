@@ -1,5 +1,5 @@
 # remimi
-This repository contains examples of some computer vision ML profgrams.
+This repository basically contains example programs for fundamental technologies for 3d reconstruction and some 3d reconstruction programs.
 
 Feel free to post issue and PR when you find problem or new feature.
 
@@ -21,21 +21,23 @@ conda activate py38_remimi
 For cuda10
 ```bash
 pip install torch torchvision torchaudio
-pip install opencv-python
-pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.8.0/index.html
+pip install mmcv-full==1.3 -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.8.0/index.html
 ```
 
 For Cuda11.
 ```bash
 pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
-pip install opencv-python
-pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.8.0/index.html
+pip install mmcv-full==1.3 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.8.0/index.html
 ```
 
 ### Remimi Installation
 ```bash
 git clone https://github.com/xiong-jie-y/remimi.git
-pip install . -e
+pip install -e .
+
+# This is necessary because mmdet installs older numpy.
+pip uninstall numpy
+pip install numpy
 ```
 
 ## Examples

@@ -6,6 +6,9 @@ numpy
 progressbar2
 pyrealsense2
 cupoch
+
+# network
+youtube-dl
 gdown
 
 # For 3d dance viewer.
@@ -25,3 +28,4 @@ mmsegmentation
 
 # detection
 mmdet @ git+https://github.com/open-mmlab/mmdetection.git
+

@@ -7,7 +7,7 @@ import torch
 import torchvision
 
 import base64
-import cupy
+# import cupy
 import cv2
 import getopt
 import glob
@@ -43,11 +43,11 @@ torch.backends.cudnn.enabled = True # make sure to use cudnn for computational p
 
 objCommon = {}
 
-exec(open('remimi/monodepth/ken3d/common.py', 'r').read())
+# exec(open('remimi/monodepth/ken3d/common.py', 'r').read())
 
-exec(open('remimi/monodepth/ken3d/disparity-estimation.py', 'r').read())
-exec(open('remimi/monodepth/ken3d/disparity-adjustment.py', 'r').read())
-exec(open('remimi/monodepth/ken3d/disparity-refinement.py', 'r').read())
+# exec(open('remimi/monodepth/ken3d/disparity-estimation.py', 'r').read())
+# exec(open('remimi/monodepth/ken3d/disparity-adjustment.py', 'r').read())
+# exec(open('remimi/monodepth/ken3d/disparity-refinement.py', 'r').read())
 # exec(open('remimi/monodepth/ken3d/pointcloud-inpainting.py', 'r').read())
 
 class Ken3DDepthEstimator:
