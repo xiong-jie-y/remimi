@@ -1,7 +1,5 @@
 # remimi
-This repository contains python library and examples to do R&D of computer vision ML efficiently. Especially this library focus on stream video or camera input processing.
-
-This library is optimized for efficient R&D and might not fit some kind of products.
+This repository contains examples of some computer vision ML profgrams.
 
 Feel free to post issue and PR when you find problem or new feature.
 
@@ -64,12 +62,45 @@ You can find classes from [here](https://github.com/open-mmlab/mmsegmentation/bl
 python examples/data_conversion/create_mask_image_dataset.py --input-file MOT17-02-FRCNN-raw.webm --output-folder test_imgs --class-names person
 ```
 
+### Quilt video generator from a monocular video
+This is the [quilt video](https://docs.lookingglassfactory.com/KeyConcepts/quilts/) generator from a monocular video.
+Basically with the quilt video you can see holographic video with Looking Glass.
+See the example of quilt video [here](https://docs.lookingglassfactory.com/KeyConcepts/how-it-works/).
+So this script is for watching holographic version of any monocular video.
+This script is not perfect, but you can enjoy some of the video.
+
+#### Video Generation without inpainting of occluded part.
+You can generate ordinary video without inpaint (occluded part will be dark).
+You can just generate quilt video by using this command. 
+`--cache-root` is the place where all the quilt image is output and maybe need more than 50GB space.
+`--video-url` is the url of the video from which quilt video is generated.
+You can add `--video-file` to indicate the location of the any video file instad of `--video-url`.
+
+IT WILL TAKE MORE THAN HOURS :D
+
+```bash
+python examples/monodepth/create_point_cloud_video.py --video-url ${VIDEO_URL} --cache-root ${CACHE_ROOT} --output-path ${OUTPUT_PATH} --create-looking-glass
+
+# Please output any video format you use to play quilt video.
+# 
+# I use hap encoding just because this is the only format that can be played
+# smoothly in linux.
+# For audio please take the auid from the original video, which is located under ${CACHE_ROOT}
+ffmpeg -framerate ${FRAMERATE_OF_ORIGINAL_VIDEO} -i %06d_lkimage.png -c:v hap ${OUTPUT_PATH}.mov
+
+# (optional) I usually convert audio seperately, because hap player doesn't support audio.
+ffmpeg -i ${ORIGINAL_VIDEO} audio.mp3
+```
+
+#### Video Generation with inpainting of occluded part.
+(TBD)
+
 ### 3D Video Viewer
 You can watch the any videos in point cloud format. 
 To create point cloud video, please use this command and wait for around 30 minutes for 4 minutes video. It requires few GB of space for caching.
 
 ```
-python examples/monodepth/create_point_cloud_video.py --video-url ${VIDEO_URL} --cache-root ${SOMEWHERE_LARGE_SPACE}
+python examples/monodepth/create_point_cloud_video.py --video-url ${VIDEO_URL} --cache-root ${SOMEWHERE_LARGE_SPACE} 
 ```
 
 After creation, you can play video with

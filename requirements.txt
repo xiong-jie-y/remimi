@@ -1,11 +1,12 @@
 # Common
-opencv-python
+opencv-contrib-python
 open3d
 click
 numpy
 progressbar2
 pyrealsense2
 cupoch
+gdown
 
 # For 3d dance viewer.
 

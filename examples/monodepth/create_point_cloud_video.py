@@ -169,12 +169,14 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
     os.makedirs(cache_folder, exist_ok=True)
 
     background_video_stream = None
+    mask_stream = None
     if video_file is not None:
         sensor = SimpleWebcamera(video_file)
         # width, height = 1280, 720
         width, height = 820, 460
-        background_video_stream = SimpleWebcamera(background_video_file)
-        mask_stream = SimpleWebcamera(mask_dir)
+        if background_video_file is not None:
+            background_video_stream = SimpleWebcamera(background_video_file)
+            mask_stream = SimpleWebcamera(mask_dir)
         # aaa = sorted(list(glob.glob(join(mask_dir, "*.png"))))
         # # print(aaa)
         # mask_stream = MultipleImageStream(aaa)
@@ -254,14 +256,15 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
 
         try:
             color, depth = cam.get_color_and_depth()
-            color_bg, depth_bg = background_depth_video_stream.get_color_and_depth()
-            human_mask = mask_stream.get_color()
+            if background_video_stream is not None:
+                color_bg, depth_bg = background_depth_video_stream.get_color_and_depth()
+                human_mask = mask_stream.get_color()
             # depth *= 1000
         except StreamFinished:
             print("Finished")
             finished = True
             import sys
-            # sys.exit(0)
+            sys.exit(0)
             continue
 
         # depth = depth.astype(np.uint16)
@@ -280,14 +283,18 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
 
         # import IPython; IPython.embed()
 
-        human_mask = cv2.cvtColor(human_mask, cv2.COLOR_RGB2GRAY)
-        depth[human_mask < 125] = 0
-        cv2.imshow("human mask", human_mask)
+        if background_video_stream:
+            human_mask = cv2.cvtColor(human_mask, cv2.COLOR_RGB2GRAY)
+            depth[human_mask < 125] = 0
+            cv2.imshow("human mask", human_mask)
+
         pcd = create_point_cloud_from_color_and_depth(color, depth, intrinsic)
-        pcd2 = create_point_cloud_from_color_and_depth(color_bg, depth_bg, intrinsic)
-        _, ind = pcd.remove_statistical_outlier(nb_neighbors=30,
-                                                std_ratio=1.0)
-        pcd = pcd.select_by_index(ind)
+
+        if background_video_stream:
+            pcd2 = create_point_cloud_from_color_and_depth(color_bg, depth_bg, intrinsic)
+            _, ind = pcd.remove_statistical_outlier(nb_neighbors=30,
+                                                    std_ratio=1.0)
+            pcd = pcd.select_by_index(ind)
 
         # person_points = []
         # person_colors = []
@@ -308,8 +315,10 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
             o3d.io.write_point_cloud(join(cache_folder, "{}.ply".format(str(frame_no).zfill(6))), pcd)
 
         with time_logger.time_measure("update PCD"):
-            vis.update_by_pcd([pcd, pcd2])
-
+            if background_video_stream:
+                vis.update_by_pcd([pcd, pcd2])
+            else:
+                vis.update_by_pcd([pcd])
 
         if create_anaglyph:
             # last adjustment
