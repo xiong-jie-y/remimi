@@ -295,6 +295,9 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
         if background_video_stream:
             human_mask = cv2.cvtColor(human_mask, cv2.COLOR_RGB2GRAY)
             depth[human_mask < 125] = 0
+            # because ground come front because of inpaint and removal of person.
+            if inpaint:
+                depth[:] -= 0.7
             cv2.imshow("human mask", human_mask)
 
         pcd = create_point_cloud_from_color_and_depth(color, depth, intrinsic)
@@ -366,6 +369,10 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
             # baseline = 0.000005
             # For 2000.
             baseline = 0.0000025
+            # For front.
+            # People is moved to front to prevent foot from penetrating ground.
+            if inpaint:
+                baseline = 0.00000125
             # Closeer camera.
             # baseline = 0.000010
             # baseline = 0.0000017
