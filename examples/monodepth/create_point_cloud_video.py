@@ -1,6 +1,7 @@
 import glob
 import os
 from os.path import basename, join
+from remimi.sensors.edit_stream import CustomizableHumanEliminatedStream, HumanEliminatedStream
 from remimi.monodepth.ken3d.depthestim import Ken3DDepthEstimator
 from remimi.detection.instance_segmentation import InstanceSegmenter
 from remimi.utils.depth import colorize2
@@ -100,16 +101,17 @@ def create_parallaxed_image(pcd, vis, intrinsic, inpaint, eliminator, cache_fold
     with logger.time_measure("capture_image"):
         left_image = (np.array(vis.vis.capture_screen_float_buffer(True)) * 255).astype(np.uint8)
 
-    if inpaint:
-        # import IPython; IPython.embed()
-        left_image_mask = create_mask(left_image).astype(np.uint8)
-        kernel = np.ones((5,5),np.uint8)
-        # left_image_mask = cv2.erode(left_image_mask,kernel,iterations = 1)
-        # import IPython; IPython.embed()
-        cv2.imshow("left inpaint mask", left_image_mask)
-        mask = cv2.cvtColor(left_image_mask, cv2.COLOR_GRAY2BGR)
-        left_inpainted_image = eliminator.eliminate_by_mask(cv2.cvtColor(left_image, cv2.COLOR_RGB2BGR), mask)
-        left_image = cv2.cvtColor(left_inpainted_image, cv2.COLOR_BGR2RGB)
+    # if inpaint:
+    #     # import IPython; IPython.embed()
+    #     left_image_mask = create_mask(left_image).astype(np.uint8)
+    #     kernel = np.ones((5,5),np.uint8)
+    #     # left_image_mask = cv2.erode(left_image_mask,kernel,iterations = 1)
+    #     # import IPython; IPython.embed()
+    #     cv2.imshow("left inpaint mask", left_image_mask)
+    #     mask = cv2.cvtColor(left_image_mask, cv2.COLOR_GRAY2BGR)
+    #     left_inpainted_image = eliminator.eliminate_by_mask(cv2.cvtColor(left_image, cv2.COLOR_RGB2BGR), mask)
+    #     left_image = cv2.cvtColor(left_inpainted_image, cv2.COLOR_BGR2RGB)
+
     # left_image_r = cv2.ximgproc.weightedMedianFilter(left_image, left_image[:, :, 0], 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
     # left_image_g = cv2.ximgproc.weightedMedianFilter(left_image, left_image[:, :, 1], 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
     # left_image_b = cv2.ximgproc.weightedMedianFilter(left_image, left_image[:, :, 2], 3, sigma=5, weightType=cv2.ximgproc.WMF_IV1)
@@ -177,9 +179,15 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
         if background_video_file is not None:
             background_video_stream = SimpleWebcamera(background_video_file)
             mask_stream = SimpleWebcamera(mask_dir)
-        # aaa = sorted(list(glob.glob(join(mask_dir, "*.png"))))
-        # # print(aaa)
-        # mask_stream = MultipleImageStream(aaa)
+        elif inpaint:
+            aaa = sorted(list(glob.glob(join(mask_dir, "*.png"))))
+            mask_stream2 = MultipleImageStream(aaa)
+            background_video_stream = CustomizableHumanEliminatedStream(
+                SimpleWebcamera(video_file), SimpleWebcamera(mask_dir), # mask_stream2
+                margin=5
+            )
+            mask_stream = SimpleWebcamera(mask_dir) # MultipleImageStream(aaa)
+        
     elif image_file is not None:
         sensor = MultipleImageStream([image_file])
         height, width, _ = cv2.imread(image_file).shape
@@ -230,10 +238,11 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
 
     vis.vis.get_render_option().background_color = np.array([0,0,0])
     # skip.
-    # for i in range(500):
-    #     sensor.get_color()
-    #     background_video_stream.get_color()
-    #     mask_stream.get_color()
+    skip_num = 0
+    for i in range(skip_num):
+        sensor.get_color()
+        background_video_stream.get_color()
+        mask_stream.get_color()
 
     time_logger = PerfLogger(print=False)
     
@@ -291,6 +300,7 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
         pcd = create_point_cloud_from_color_and_depth(color, depth, intrinsic)
 
         if background_video_stream:
+            cv2.imshow("background depth", colorize2(depth_bg))
             pcd2 = create_point_cloud_from_color_and_depth(color_bg, depth_bg, intrinsic)
             _, ind = pcd.remove_statistical_outlier(nb_neighbors=30,
                                                     std_ratio=1.0)

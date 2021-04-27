@@ -16,13 +16,15 @@ conda activate py38_remimi
 ```
 
 ### Dependencies
-For cuda10
+For cuda10.2.
 ```bash
 pip install torch torchvision torchaudio
 pip install mmcv-full==1.3 -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.8.0/index.html
 ```
 
-For Cuda11.
+For Cuda11.1.
+The cuda verions of mmcv should be match perfectly.
+
 ```bash
 pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
 pip install mmcv-full==1.3 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.8.0/index.html
@@ -32,6 +34,10 @@ pip install mmcv-full==1.3 -f https://download.openmmlab.com/mmcv/dist/cu111/tor
 ```bash
 git clone https://github.com/xiong-jie-y/remimi.git
 pip install -e .
+
+# Because version is old.
+pip uninstall tensorflow
+pip install tensorflow
 
 # This is necessary because mmdet installs older numpy.
 pip uninstall numpy
@@ -90,6 +96,23 @@ ffmpeg -framerate ${FRAMERATE_OF_ORIGINAL_VIDEO} -i %06d_lkimage.png -c:v hap ${
 
 # (optional) I usually convert audio seperately, because hap player doesn't support audio.
 ffmpeg -i ${ORIGINAL_VIDEO} audio.mp3
+```
+
+#### Video Generation with a frame by frame inapting of occluded part.
+Generate a mask to show the occlusion. 
+This is the procedure to make a mask of people.
+
+```
+python examples/data_conversion/create_mask_image_dataset.py --video-url ${VIDEO_URL} --output-folder ${MASK_OUTPUT_LOCATION} --class-names person --margin 0 --cache-root ${CACHE_ROOT}
+
+cd ${MASK_OUTPUT_LOCATION}/masks
+ffmpeg -framerate ${FRAME_RATE} -i %05d.png -vcodec libx264 -s 820x460 -pix_fmt yuv420p -crf 18 ${MASK_VIDEO_LOCATION}
+```
+
+Then generate quilt video from the mask video and the original video.
+
+```
+python examples/monodepth/create_point_cloud_video.py --video-url ${VIDEO_URL} --mask-dir ${MASK_VIDEO_LOCATION} --cache-root ${CACHE_ROOT} --inpaint --create-looking-glass
 ```
 
 #### Video Generation with inpainting of occluded part.

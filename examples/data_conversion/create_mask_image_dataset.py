@@ -1,4 +1,5 @@
 from os.path import join
+from remimi.utils.file import ensure_video
 from remimi.sensors.file import MultipleImageStream
 from remimi.sensors.edit_stream import SaveMaskAndFrameSink
 from remimi.sensors.webcamera import SimpleWebcamera
@@ -10,18 +11,22 @@ from remimi.sensors import StreamFinished
 
 @click.command()
 @click.option("--video-file")
+@click.option("--video-url")
+@click.option("--cache-root")
 @click.option("--image-folder")
 @click.option("--output-folder")
 @click.option("--class-names", multiple=True)
 @click.option("--margin", type=int, default=1)
-def main(video_file, image_folder, output_folder, class_names, margin):
+def main(video_file, video_url, cache_root, image_folder, output_folder, class_names, margin):
+    if video_url is not None:
+        video_file = ensure_video(video_url, cache_root)
     if video_file:
         video_stream = SimpleWebcamera(video_file)
-    elif image_folder:
-        aa = sorted(list(glob.glob(join(image_folder, "*.jpg"))) + list(glob.glob(join(image_folder, "*.png"))))
-        video_stream = MultipleImageStream(aa)
-    else:
-        raise RuntimeError("No input.")
+    # elif image_folder:
+    #     aa = sorted(list(glob.glob(join(image_folder, "*.jpg"))) + list(glob.glob(join(image_folder, "*.png"))))
+    #     video_stream = MultipleImageStream(aa)
+    # else:
+    #     raise RuntimeError("No input.")
     sink = SaveMaskAndFrameSink(video_stream, output_folder, class_names, margin)
 
     frame_no = 0
