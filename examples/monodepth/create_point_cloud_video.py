@@ -373,6 +373,7 @@ def run(video_file, background_video_file, mask_dir, image_file, video_url, cach
             # People is moved to front to prevent foot from penetrating ground.
             if inpaint:
                 baseline = 0.00000125
+                baseline = 0.00000140
             # Closeer camera.
             # baseline = 0.000010
             # baseline = 0.0000017

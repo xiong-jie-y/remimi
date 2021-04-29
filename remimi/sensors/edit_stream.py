@@ -11,7 +11,8 @@ from remimi.segmentation.rgb_segmentation import SemanticSegmenter
 class HumanEliminatedStream:
     def __init__(self, sensor, margin=1):
         self.sensor = sensor
-        self.semantic_segmentater = SemanticSegmenter()
+        # self.semantic_segmentater = SemanticSegmenter()
+        self.semantic_segmentater = InstanceSegmenter()
         self.eliminator = MaskEliminator()
         self.margin = margin
 
@@ -26,6 +27,32 @@ class HumanEliminatedStream:
         cv2.imshow("Mask", color2)
 
         return self.eliminator.eliminate_by_mask(color, cv2.cvtColor(color2, cv2.COLOR_GRAY2BGR))
+
+
+class CustomizableHumanEliminatedStream:
+    def __init__(self, sensor, mask_stream, margin=1):
+        self.sensor = sensor
+        self.eliminator = MaskEliminator()
+        self.mask_stream = mask_stream
+        self.margin = margin
+
+    def get_color(self):
+        color = self.sensor.get_color()
+        cv2.imshow("Original", color)
+
+        color2 = self.mask_stream.get_color()
+
+        color2 = cv2.cvtColor(color2, cv2.COLOR_RGB2GRAY)
+        black_pass_mask = np.zeros(color2.shape, dtype=np.uint8)
+        black_pass_mask[color2 > 125] = 0
+        black_pass_mask[color2 < 125] = 255
+
+        cv2.imshow("inpaint mask", black_pass_mask)
+
+        # import IPython; IPython.embed()
+
+        return self.eliminator.eliminate_by_mask(color, cv2.cvtColor(black_pass_mask, cv2.COLOR_GRAY2BGR))
+
 
 OUTPUT_SIZE = (819, 455)
 
