@@ -128,7 +128,6 @@ ffmpeg -framerate ${FRAMERATE_OF_ORIGINAL_VIDEO} -i %06d_lkimage.png -c:v hap ${
 # (optional) I usually convert audio seperately, because hap player doesn't support audio.
 ffmpeg -i ${ORIGINAL_VIDEO} audio.mp3
 ```
-```
 
 #### Video Generation with inpainting of occluded part.
 (TBD)
