@@ -112,8 +112,23 @@ bash ./apps/quilt_video_generator/generate_frame_by_frame_inpainted_video.sh ${Y
 The images for each frame are output under ${CACHE_PATH}.
 Please generate video with ffmpeg command.
 
-If you OS is windows or mac, you can just create mp4.
-You can refer this [slide.](https://www.slideshare.net/ssuser741a3c/looking-glass-videoplayer) (Sorry it's written in Japanese.)
+If your OS is windows or mac, mp4 can be played in Unity.
+You can refer this [slide](https://www.slideshare.net/ssuser741a3c/looking-glass-videoplayer) to create video and play quilt video. (Sorry it's written in Japanese.)
+
+For ubuntu, the above command is useful and [HapPlayer unity plugin](https://github.com/keijiro/KlakHap) in unity is useful.
+
+```
+# Please output any video format you use to play quilt video.
+# 
+# I use hap encoding just because this is the only format that can be played
+# smoothly in linux.
+# For audio please take the auid from the original video, which is located under ${CACHE_ROOT}
+ffmpeg -framerate ${FRAMERATE_OF_ORIGINAL_VIDEO} -i %06d_lkimage.png -c:v hap ${OUTPUT_PATH}.mov
+
+# (optional) I usually convert audio seperately, because hap player doesn't support audio.
+ffmpeg -i ${ORIGINAL_VIDEO} audio.mp3
+```
+```
 
 #### Video Generation with inpainting of occluded part.
 (TBD)
