@@ -1,5 +1,6 @@
 import os
 import glob
+from remimi.utils.depth import DPTDepthImageContainer
 from remimi.segmentation.rgb_segmentation import SemanticSegmenter
 import torch
 import cv2
@@ -159,3 +160,8 @@ class DPTDepthEstimator:
         # color = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         depth = get_inverse_map(prediction.astype(np.uint16))
         return depth
+
+    def estimate_and_get_depth_image_container(self, color_image):
+        return DPTDepthImageContainer(
+            color_image.shape,
+            self.estimate_depth_raw(color_image))

@@ -22,29 +22,40 @@ def colorize2(image):
     depth = cv2.applyColorMap(depth, cv2.COLORMAP_TURBO)
     return depth
 
-def get_depth(disparity_image):
-    """
 
-    Arguments:
-        - disparity_image: (H, W) disparity.
-    """
-    baseline = 40
-    focal_length = max(disparity_image.shape[1], disparity_image.shape[2]) / 2.0
+class DPTDepthImageContainer:
+    def __init__(self, original_size, inverse_depth_image: torch.Tensor):
+        """Create container with raw output of DPT.
+        
+        The definition of inverse depth is correspond to the definiton in stereo depth estimation.
+        The value is supposed to the direct output of DPT.
 
-    disparity_image = disparity_image.unsqueeze(0)
+        Arguments:
+            - inverse_depth_image: (1, H, W) inverse depth and this is susupposed to on some cuda core.
+        """
+        self.inverse_depth_image = inverse_depth_image
 
-    # import IPython; IPython.embed()
-    disparity_image = torch.nn.functional.interpolate(
-        disparity_image, size=(480, 640), mode='bilinear'
-    ) * (max(disparity_image.shape[0], disparity_image.shape[1]) / 256.0)
+    def get_depth_image(self):
+        """Get depth image from a inverse depth images.
 
-    # to avoid zero division.
-    # disparity_image[disparity_image == 0] = 0.0000001
-    depth_image = ((focal_length * baseline) / disparity_image + 0.0000001)[0, 0, :, :].cpu().numpy()
-    # 255 is randomly chosen not related to 8bit.
-    depth_image[depth_image > 40000] = 40000
+        Returns: 
+            Depth image. The infinity is cliped to max value in the depth.
+        """
+        inverse_depth_image = self.inverse_depth_image
+        inverse_depth_image = inverse_depth_image.unsqueeze(0).double()
 
-    return depth_image.astype(np.float32)
+        scale_ratio = 1.0
 
-# class DepthImage:
-    
+        inverse_depth_image = torch.nn.functional.interpolate(
+            inverse_depth_image, size=(480, 640), mode='bilinear', align_corners=False
+        )[0, 0, :, :].cpu().numpy() * scale_ratio
+
+        depth_image = 1.0 / inverse_depth_image
+
+        # To replace infinity.
+        finite_depth_image = depth_image.clip(np.nanmin(depth_image), np.nanmax(depth_image[depth_image != np.inf]))
+
+        return finite_depth_image
+
+    def get_inverse_depth_image(self):
+        return self.inverse_depth_image
