@@ -114,15 +114,21 @@ for label_id in np.unique(labels):
     one_edge_image = np.zeros(edge_image.shape, dtype=np.uint8)
     one_edge_image[labels == label_id] = 255
 
-    dilated_edge_for_one_image = cv2.morphologyEx(one_edge_image, cv2.MORPH_DILATE, np.ones((3,3)), iterations=40)
-    show_image_ui(dilated_edge_for_one_image, cmap=plt.cm.gray)
+    dilated_edge_for_one_image = cv2.morphologyEx(
+        one_edge_image, cv2.MORPH_DILATE, np.ones((3,3)), iterations=20)
+    # show_image_ui(dilated_edge_for_one_image, cmap=plt.cm.gray)
 
     depth_in_the_region = depth_image_u16[dilated_edge_for_one_image == 255]
-    ret_val, mask = cv2.threshold(depth_in_the_region,np.min(depth_in_the_region), np.max(depth_in_the_region), cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    ret_val, mask = cv2.threshold(
+        depth_in_the_region,
+        np.min(depth_in_the_region), 
+        np.max(depth_in_the_region), 
+        cv2.THRESH_BINARY+cv2.THRESH_OTSU
+    )
     foreground_image = np.zeros(edge_image.shape, dtype=np.uint8)
     foreground_slice=  np.bitwise_and(dilated_edge_for_one_image == 255, depth_image_u16 < ret_val)
     foreground_image[foreground_slice] = 255
-    show_image_ui(foreground_image, cmap=plt.cm.gray)
+    # show_image_ui(foreground_image, cmap=plt.cm.gray)
 
     foreground_mask[foreground_slice] =255
 
