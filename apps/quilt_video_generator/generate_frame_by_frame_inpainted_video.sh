@@ -24,4 +24,4 @@ python examples/monodepth/create_point_cloud_video.py \
     --video-url $VIDEO_ID \
     --mask-dir $CACHE_ROOT/$MASK_FOLDER.mp4 \
     --cache-root $CACHE_ROOT \
-    --inpaint --create-looking-glass
+    --create-looking-glass
