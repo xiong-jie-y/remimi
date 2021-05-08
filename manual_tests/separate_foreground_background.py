@@ -49,7 +49,7 @@ def zero_crossing_v1(image):
  
     return z_c_image
 
-rgb_image = cv2.imread("pexels.jpg")
+rgb_image = cv2.imread("data/examples/person_portrait.jpg")
 
 estimator = DPTDepthEstimator()
 depth_image_container = estimator.estimate_and_get_depth_image_container(rgb_image)
