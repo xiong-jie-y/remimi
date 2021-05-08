@@ -1,3 +1,4 @@
+from remimi.utils.depth import clip_depth_to_foreground, colorize2, create_foreground_mask, create_foreground_mask_v2, remove_outlier
 from matplotlib import pyplot as plt
 import streamlit as st
 import os
@@ -48,89 +49,24 @@ def zero_crossing_v1(image):
  
     return z_c_image
 
-rgb_image = cv2.imread("data/rgbd_inpaint_test/00027.jpg")
+rgb_image = cv2.imread("pexels.jpg")
 
-if not os.path.exists("data/rgbd_inpaint_test/depth.npy"):
-    estimator = DPTDepthEstimator()
-    mask_image = cv2.imread("data/rgbd_inpaint_test/00027.png")
+estimator = DPTDepthEstimator()
+depth_image_container = estimator.estimate_and_get_depth_image_container(rgb_image)
+depth_image = depth_image_container.get_depth_image()
 
-    depth_image_container = estimator.estimate_and_get_depth_image_container(rgb_image)
-    depth_image = depth_image_container.get_depth_image()
+clipped_depth = clip_depth_to_foreground(depth_image)
+clipped_depth_image_u16 = cv2.normalize(clipped_depth, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+show_image_ui(clipped_depth_image_u16, cmap=plt.cm.inferno)
 
-    np.save("data/rgbd_inpaint_test/depth", depth_image)
-else:
-    depth_image = np.load("data/rgbd_inpaint_test/depth.npy")
+np.save("data/rgbd_inpaint_test/depth", depth_image)
 
+st.markdown("## Occlusion Mask for Looking Glass")
+show_image_ui(create_foreground_mask(depth_image), cmap=plt.cm.gray)
 
-depth_median = np.percentile(depth_image, 20)
-depth_mean_diff = np.median(np.abs(depth_image - depth_median))
-depth_min = depth_median - depth_mean_diff
-depth_max = depth_median + depth_mean_diff
-
-depth_image_u16 = cv2.normalize(depth_image, None, 0, 2 ** 16, cv2.NORM_MINMAX, dtype=cv2.CV_16U)
-
-depth_image = depth_image.clip(depth_min, depth_max)
-
-depth_image_u16 = cv2.normalize(depth_image, None, 0, 2 ** 16, cv2.NORM_MINMAX, dtype=cv2.CV_16U)
-depth_image = cv2.GaussianBlur(depth_image,(3,3),8)
-edge_image = cv2.Laplacian(depth_image, cv2.CV_64F)
-
-def zero_crossing_v2(LoG):
-    minLoG = cv2.morphologyEx(LoG, cv2.MORPH_ERODE, np.ones((3,3)))
-    maxLoG = cv2.morphologyEx(LoG, cv2.MORPH_DILATE, np.ones((3,3)))
-    zeroCross = np.logical_or(np.logical_and(minLoG < 0,  LoG > 0), np.logical_and(maxLoG > 0, LoG < 0))
-    return zeroCross
-
-
-def zero_crossing_v3(LoG):
-    minLoG = cv2.morphologyEx(LoG, cv2.MORPH_ERODE, np.ones((3,3)))
-    maxLoG = cv2.morphologyEx(LoG, cv2.MORPH_DILATE, np.ones((3,3)))
-    sloop = maxLoG - minLoG
-    zeroCross = np.logical_and(
-        # This is the approximate solution to set t he minimum sloop.
-        (sloop > np.percentile(sloop, 95)),
-        np.logical_or(
-            np.logical_and(minLoG < 0,  LoG > 0),
-            np.logical_and(maxLoG > 0, LoG < 0))
-    )
-    gray = np.zeros(zeroCross.shape, dtype=np.uint8)
-    gray[zeroCross] = 255
-    st.write(zeroCross.dtype)
-    return cv2.morphologyEx(gray, cv2.MORPH_OPEN, np.ones((2,2)))
-
-show_image_ui(zero_crossing_v1(edge_image), cmap=plt.cm.gray)
-show_image_ui(zero_crossing_v2(edge_image), cmap=plt.cm.gray)
-show_image_ui(zero_crossing_v3(edge_image), cmap=plt.cm.gray)
-
-edge_image = zero_crossing_v3(edge_image)
-st.write(edge_image.dtype)
-_, labels = cv2.connectedComponents(edge_image)
-
-foreground_mask = np.zeros(edge_image.shape, np.uint8)
-
-for label_id in np.unique(labels):
-    if label_id == 0:
-        continue
-    one_edge_image = np.zeros(edge_image.shape, dtype=np.uint8)
-    one_edge_image[labels == label_id] = 255
-
-    dilated_edge_for_one_image = cv2.morphologyEx(
-        one_edge_image, cv2.MORPH_DILATE, np.ones((3,3)), iterations=20)
-    # show_image_ui(dilated_edge_for_one_image, cmap=plt.cm.gray)
-
-    depth_in_the_region = depth_image_u16[dilated_edge_for_one_image == 255]
-    ret_val, mask = cv2.threshold(
-        depth_in_the_region,
-        np.min(depth_in_the_region), 
-        np.max(depth_in_the_region), 
-        cv2.THRESH_BINARY+cv2.THRESH_OTSU
-    )
-    foreground_image = np.zeros(edge_image.shape, dtype=np.uint8)
-    foreground_slice=  np.bitwise_and(dilated_edge_for_one_image == 255, depth_image_u16 < ret_val)
-    foreground_image[foreground_slice] = 255
-    # show_image_ui(foreground_image, cmap=plt.cm.gray)
-
-    foreground_mask[foreground_slice] =255
-
-show_image_ui(labels)
-show_image_ui(foreground_mask, cmap=plt.cm.gray)
+st.markdown("## Background Removal")
+show_image_ui(rgb_image[:, :, ::-1])
+mask = create_foreground_mask_v2(depth_image)
+show_image_ui(mask, cmap=plt.cm.gray)
+rgb_image_masked = cv2.bitwise_and(rgb_image, rgb_image, mask=mask)
+show_image_ui(rgb_image_masked[:, :, ::-1])
