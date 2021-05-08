@@ -163,5 +163,5 @@ class DPTDepthEstimator:
 
     def estimate_and_get_depth_image_container(self, color_image):
         return DPTDepthImageContainer(
-            color_image.shape,
+            (color_image.shape[0], color_image.shape[1]),
             self.estimate_depth_raw(color_image))

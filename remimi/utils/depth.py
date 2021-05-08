@@ -91,15 +91,13 @@ def create_foreground_mask_v2(depth_image, debug=False):
     # type cast is necessary because depth is u16.
     return foreground_mask
 
-def create_foreground_mask(depth_image, debug=False):
+def get_foreground_background_edges(depth_image, debug=False):
     edge_image = detect_edge(depth_image, statistical_zero_crossing)
 
     depth_image = clip_depth_to_foreground(depth_image)
     depth_image_u16 = cv2.normalize(depth_image, None, 0, 2 ** 16, cv2.NORM_MINMAX, dtype=cv2.CV_16U)
 
     _, labels = cv2.connectedComponents(edge_image)
-
-    foreground_mask = np.zeros(edge_image.shape, dtype=np.uint8)
 
     for label_id in np.unique(labels):
         if label_id == 0:
@@ -108,7 +106,7 @@ def create_foreground_mask(depth_image, debug=False):
         one_edge_image[labels == label_id] = 255
 
         dilated_edge_for_one_image = cv2.morphologyEx(
-            one_edge_image, cv2.MORPH_DILATE, np.ones((3,3)), iterations=20)
+            one_edge_image, cv2.MORPH_DILATE, np.ones((3,3)), iterations=30)
         if debug:
             show_image_ui(dilated_edge_for_one_image, cmap=plt.cm.gray)
 
@@ -119,11 +117,18 @@ def create_foreground_mask(depth_image, debug=False):
             np.max(depth_in_the_region), 
             cv2.THRESH_BINARY+cv2.THRESH_OTSU
         )
-        foreground_image = np.zeros(edge_image.shape, dtype=np.uint8)
         foreground_slice = np.bitwise_and(
             dilated_edge_for_one_image == 255, depth_image_u16 < fore_back_threash)
-        foreground_image[foreground_slice] = 255
+        background_slice = np.bitwise_and(
+            dilated_edge_for_one_image == 255, depth_image_u16 >= fore_back_threash)
+        yield foreground_slice, background_slice, one_edge_image
 
+def create_foreground_mask(depth_image, debug=False):
+    foreground_mask = np.zeros(depth_image.shape, dtype=np.uint8)
+
+    for foreground_slice, _, _ in get_foreground_background_edges(depth_image):
+        foreground_image = np.zeros(depth_image.shape, dtype=np.uint8)
+        foreground_image[foreground_slice] = 255
         if debug:
             show_image_ui(foreground_image, cmap=plt.cm.gray)
 
@@ -168,4 +173,11 @@ class DPTDepthImageContainer:
         return finite_depth_image
 
     def get_inverse_depth_image(self):
-        return self.inverse_depth_image
+        resized_disparity = torch.nn.functional.interpolate(
+            self.inverse_depth_image.unsqueeze(1),
+            size=self.original_size,
+            mode="bicubic",
+            align_corners=False,
+        ).squeeze().cpu().numpy()
+
+        return resized_disparity
