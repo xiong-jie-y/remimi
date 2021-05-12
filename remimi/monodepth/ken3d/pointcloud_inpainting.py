@@ -1,3 +1,30 @@
+import base64
+import getopt
+import glob
+import io
+import math
+import os
+import random
+import re
+import shutil
+import sys
+import tempfile
+import time
+import urllib
+import zipfile
+
+# import cupy
+import cv2
+import h5py
+import moviepy
+import moviepy.editor
+import numpy
+import scipy
+import scipy.io
+import torch
+import torchvision
+
+
 class Basic(torch.nn.Module):
 	def __init__(self, strType, intChannels):
 		super(Basic, self).__init__()
@@ -74,6 +101,40 @@ class Upsample(torch.nn.Module):
 	# end
 # end
 
+def spatial_filter(tenInput, strType):
+	tenOutput = None
+
+	if strType == 'laplacian':
+		tenLaplacian = tenInput.new_zeros(tenInput.shape[1], tenInput.shape[1], 3, 3)
+
+		for intKernel in range(tenInput.shape[1]):
+			tenLaplacian[intKernel, intKernel, 0, 1] = -1.0
+			tenLaplacian[intKernel, intKernel, 0, 2] = -1.0
+			tenLaplacian[intKernel, intKernel, 1, 1] = 4.0
+			tenLaplacian[intKernel, intKernel, 1, 0] = -1.0
+			tenLaplacian[intKernel, intKernel, 2, 0] = -1.0
+		# end
+
+		tenOutput = torch.nn.functional.pad(input=tenInput, pad=[ 1, 1, 1, 1 ], mode='replicate')
+		tenOutput = torch.nn.functional.conv2d(input=tenOutput, weight=tenLaplacian)
+
+	elif strType == 'median-3':
+		tenOutput = torch.nn.functional.pad(input=tenInput, pad=[ 1, 1, 1, 1 ], mode='reflect')
+		tenOutput = tenOutput.unfold(2, 3, 1).unfold(3, 3, 1)
+		tenOutput = tenOutput.contiguous().view(tenOutput.shape[0], tenOutput.shape[1], tenOutput.shape[2], tenOutput.shape[3], 3 * 3)
+		tenOutput = tenOutput.median(-1, False)[0]
+
+	elif strType == 'median-5':
+		tenOutput = torch.nn.functional.pad(input=tenInput, pad=[ 2, 2, 2, 2 ], mode='reflect')
+		tenOutput = tenOutput.unfold(2, 5, 1).unfold(3, 5, 1)
+		tenOutput = tenOutput.contiguous().view(tenOutput.shape[0], tenOutput.shape[1], tenOutput.shape[2], tenOutput.shape[3], 5 * 5)
+		tenOutput = tenOutput.median(-1, False)[0]
+
+	# end
+
+	return tenOutput
+# end
+
 class Inpaint(torch.nn.Module):
 	def __init__(self):
 		super(Inpaint, self).__init__()
@@ -109,11 +170,11 @@ class Inpaint(torch.nn.Module):
 		self.netDisparity = Basic('conv-relu-conv', [ 32, 32, 1 ])
 	# end
 
-	def forward(self, tenImage, tenDisparity, tenShift):
-		tenDepth = (objCommon['fltFocal'] * objCommon['fltBaseline']) / (tenDisparity + 0.0000001)
-		tenValid = (spatial_filter(tenDisparity / tenDisparity.max(), 'laplacian').abs() < 0.03).float()
-		tenPoints = depth_to_points(tenDepth * tenValid, objCommon['fltFocal'])
-		tenPoints = tenPoints.view(1, 3, -1)
+	def forward(self, tenImage, tenDisparity, tenExisting):
+		# tenDepth = (objCommon['fltFocal'] * objCommon['fltBaseline']) / (tenDisparity + 0.0000001)
+		# tenValid = (spatial_filter(tenDisparity / tenDisparity.max(), 'laplacian').abs() < 0.03).float()
+		# tenPoints = depth_to_points(tenDepth * tenValid, objCommon['fltFocal'])
+		# tenPoints = tenPoints.view(1, 3, -1)
 
 		tenMean = [ tenImage.view(tenImage.shape[0], -1).mean(1, True).view(tenImage.shape[0], 1, 1, 1), tenDisparity.view(tenDisparity.shape[0], -1).mean(1, True).view(tenDisparity.shape[0], 1, 1, 1) ]
 		tenStd = [ tenImage.view(tenImage.shape[0], -1).std(1, True).view(tenImage.shape[0], 1, 1, 1), tenDisparity.view(tenDisparity.shape[0], -1).std(1, True).view(tenDisparity.shape[0], 1, 1, 1) ]
@@ -128,9 +189,12 @@ class Inpaint(torch.nn.Module):
 
 		tenContext = self.netContext(torch.cat([ tenImage, tenDisparity ], 1))
 
-		tenRender, tenExisting = render_pointcloud(tenPoints + tenShift, torch.cat([ tenImage, tenDisparity, tenContext ], 1).view(1, 68, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
+		# tenRender, tenExisting = render_pointcloud(tenPoints + tenShift, torch.cat([ tenImage, tenDisparity, tenContext ], 1).view(1, 68, -1), objCommon['intWidth'], objCommon['intHeight'], objCommon['fltFocal'], objCommon['fltBaseline'])
 
-		tenExisting = (tenExisting > 0.0).float()
+		# tenExisting = (tenExisting > 0.0).float()
+		# tenExisting = tenExisting * spatial_filter(tenExisting, 'median-5')
+
+		tenRender = torch.cat([tenImage, tenDisparity, tenContext], 1)
 		tenExisting = tenExisting * spatial_filter(tenExisting, 'median-5')
 		tenRender = tenRender * tenExisting.clone().detach()
 
@@ -194,6 +258,6 @@ class Inpaint(torch.nn.Module):
 netInpaint = Inpaint().cuda().eval()
 netInpaint.load_state_dict({ strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in torch.hub.load_state_dict_from_url(url='http://content.sniklaus.com/kenburns/network-inpainting.pytorch', file_name='kenburns-inpainting').items() })
 
-def pointcloud_inpainting(tenImage, tenDisparity, tenShift):
-	return netInpaint(tenImage, tenDisparity, tenShift)
+def pointcloud_inpainting(tenImage, tenDisparity, tenExisting):
+	return netInpaint(tenImage, tenDisparity, tenExisting)
 # end

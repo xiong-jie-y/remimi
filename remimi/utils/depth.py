@@ -30,14 +30,14 @@ def zero_crossing_v2(LoG):
     zeroCross = np.logical_or(np.logical_and(minLoG < 0,  LoG > 0), np.logical_and(maxLoG > 0, LoG < 0))
     return zeroCross
 
-def statistical_zero_crossing(laplacian_image):
+def statistical_zero_crossing(laplacian_image, slope_threshold=95):
     """zero crossing edge detection that takes 90% of bigger sloop edge."""
     minLoG = cv2.morphologyEx(laplacian_image, cv2.MORPH_ERODE, np.ones((3,3)))
     maxLoG = cv2.morphologyEx(laplacian_image, cv2.MORPH_DILATE, np.ones((3,3)))
     sloop = maxLoG - minLoG
     zeroCross = np.logical_and(
         # This is the approximate solution to set t he minimum sloop.
-        (sloop > np.percentile(sloop, 95)),
+        (sloop > np.percentile(sloop, slope_threshold)),
         np.logical_or(
             np.logical_and(minLoG < 0,  laplacian_image > 0),
             np.logical_and(maxLoG > 0, laplacian_image < 0))
@@ -62,8 +62,9 @@ def clip_depth_to_foreground(depth_image, foreground_rate = 20):
 
     return depth_image
 
-def detect_edge(depth_image, zero_crossing_method):
-    depth_image = clip_depth_to_foreground(depth_image)
+def detect_edge(depth_image, zero_crossing_method=statistical_zero_crossing, clip=True):
+    if clip:
+        depth_image = clip_depth_to_foreground(depth_image)
     depth_image = cv2.GaussianBlur(depth_image,(3,3),8)
     edge_image = cv2.Laplacian(depth_image, cv2.CV_64F)
 
@@ -106,7 +107,7 @@ def get_foreground_background_edges(depth_image, debug=False):
         one_edge_image[labels == label_id] = 255
 
         dilated_edge_for_one_image = cv2.morphologyEx(
-            one_edge_image, cv2.MORPH_DILATE, np.ones((3,3)), iterations=30)
+            one_edge_image, cv2.MORPH_DILATE, np.ones((3,3)), iterations=20)
         if debug:
             show_image_ui(dilated_edge_for_one_image, cmap=plt.cm.gray)
 
@@ -180,4 +181,4 @@ class DPTDepthImageContainer:
             align_corners=False,
         ).squeeze().cpu().numpy()
 
-        return resized_disparity
+        return resized_disparity.astype(np.float32)
