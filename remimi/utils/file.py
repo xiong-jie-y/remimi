@@ -35,6 +35,17 @@ def get_model_file(name, url):
 
     return filepath
 
+import gdown
+
+def get_model_file_from_gdrive(name, url):
+    filepath = os.path.join(MODEL_PATH_ROOT_, name)
+    if not os.path.exists(filepath):
+        os.makedirs(MODEL_PATH_ROOT_, exist_ok=True)
+        gdown.download(url, filepath)
+
+    return filepath
+
+
 def ensure_video(video_url, cache_root):
     ydl_opts = {
         "outtmpl": join(cache_root, "videos", "%(id)s.%(ext)s")
@@ -42,13 +53,13 @@ def ensure_video(video_url, cache_root):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         a = ydl.extract_info(video_url)
         original_video_file = join(cache_root, "videos", f"{a['id']}.{a['ext']}")
-        video_file = join(cache_root, "videos", f"{a['id']}_res.mp4")
+        video_file = join(cache_root, "videos", f"{a['id']}_quilt.mp4")
         
         if not os.path.exists(original_video_file):
             original_video_file = join(cache_root, "videos", f"{a['id']}.mkv")
 
         import subprocess
         if not os.path.exists(video_file):
-            subprocess.run(f"ffmpeg -y -i {original_video_file} -s 640x480  {video_file}", shell=True, check=True)
+            subprocess.run(f"ffmpeg -y -i {original_video_file} -s 820x460  {video_file}", shell=True, check=True)
 
     return video_file
