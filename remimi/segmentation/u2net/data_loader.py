@@ -266,3 +266,44 @@ class SalObjDataset(Dataset):
 			sample = self.transform(sample)
 
 		return sample
+
+class SalObjDataset2(Dataset):
+	def __init__(self,images,transform=None):
+		# self.root_dir = root_dir
+		# self.image_name_list = glob.glob(image_dir+'*.png')
+		# self.label_name_list = glob.glob(label_dir+'*.png')
+		self.images = images
+		self.transform = transform
+
+	def __len__(self):
+		return len(self.images)
+
+	def __getitem__(self,idx):
+
+		# image = Image.open(self.image_name_list[idx])#io.imread(self.image_name_list[idx])
+		# label = Image.open(self.label_name_list[idx])#io.imread(self.label_name_list[idx])
+
+		image = self.images[idx]
+		# list[idx]
+		imidx = np.array([idx])
+
+		label_3 = np.zeros(image.shape)
+	
+		label = np.zeros(label_3.shape[0:2])
+		if(3==len(label_3.shape)):
+			label = label_3[:,:,0]
+		elif(2==len(label_3.shape)):
+			label = label_3
+
+		if(3==len(image.shape) and 2==len(label.shape)):
+			label = label[:,:,np.newaxis]
+		elif(2==len(image.shape) and 2==len(label.shape)):
+			image = image[:,:,np.newaxis]
+			label = label[:,:,np.newaxis]
+
+		sample = {'imidx':imidx, 'image':image, 'label':label}
+
+		if self.transform:
+			sample = self.transform(sample)
+
+		return sample

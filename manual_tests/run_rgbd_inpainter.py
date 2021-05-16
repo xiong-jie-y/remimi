@@ -17,15 +17,15 @@ def main():
     estimator = DPTDepthEstimator()
     rgb_image = cv2.imread(args.filename)
     rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+    # rgb_image = cv2.resize(rgb_image, (1280, 720))
     depth_image_container = estimator.estimate_and_get_depth_image_container(rgb_image)
 
     if args.mask_inpainter == "edge_based":
         inpainter = EdgeBasedRGBDInpainter(debug=True)
         inpainter.inpaint_occluding_objects(rgb_image, depth_image_container)
     elif args.mask_inpainter == "joint_rgbd":
-        inpainter = JointRGBAndDepthInpainter(options=JointRGBAndDepthInpainter.to_options(args))
-        inpainter.inpaint_occluding_objects(
-            rgb_image, depth_image_container) # , method=OccludingObjectsInpaintMethod.OtsuMask)
+        inpainter = JointRGBAndDepthInpainter(option=JointRGBAndDepthInpainter.to_option(args))
+        inpainter.inpaint_occluding_objects(rgb_image, depth_image_container)
     else:
         raise RuntimeError(f"No such methods {args.mask_inpainter}.")
 

@@ -1,10 +1,12 @@
 import dataclasses
+from remimi.segmentation.u2net_wrapper import U2MaskModel
+
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from remimi.monodepth.ken3d.pointcloud_inpainting import pointcloud_inpainting
-from remimi.utils.depth import DPTDepthImageContainer, create_foreground_mask, create_roi_from_foreground_and_background_slice, get_foreground_background_edges
+from remimi.utils.depth import DPTDepthImageContainer, create_foreground_mask, create_roi_from_foreground_and_background_slice, create_roi_from_u8_mask, get_foreground_background_edges
 from remimi.utils.image import show_image_ui
 
 
@@ -15,6 +17,7 @@ import simple_parsing
 class OccludingObjectsInpaintMethod(enum.Enum):
     EdgeByEdge = "edge_by_edge"
     OtsuMask = "otsu_mask"
+    U2NetPretrained = "u2_net_pretrained"
 
 @dataclasses.dataclass
 class JointRGBAndDepthOption:
@@ -27,15 +30,18 @@ class JointRGBAndDepthInpainter:
     This method is based on the RGBD inpainting method described in 
     '3d ken burns effect from a single image'.
     """
-    def __init__(self, options):
-        self.options = options
+    def __init__(self, option: JointRGBAndDepthOption):
+        self.option = option
+
+        if self.option.inpaint_method == OccludingObjectsInpaintMethod.U2NetPretrained:
+            self.u2_mask_model = U2MaskModel()
 
     @classmethod
     def add_arguments(cls, parser: simple_parsing.ArgumentParser):
         parser.add_arguments(JointRGBAndDepthOption, dest="joint_rgbd")
     
     @classmethod
-    def to_options(cls, arguments):
+    def to_option(cls, arguments):
         return arguments.joint_rgbd
 
     def __inpaint_with_inpaint_mask(self, rgb_image, depth_image, disparity_image, inpaint_mask_image):
@@ -74,7 +80,7 @@ class JointRGBAndDepthInpainter:
         depth_image = depth_image_container.get_depth_image()
         disparity_image = depth_image_container.get_inverse_depth_image()
 
-        if self.options.inpaint_method == OccludingObjectsInpaintMethod.EdgeByEdge:
+        if self.option.inpaint_method == OccludingObjectsInpaintMethod.EdgeByEdge:
             combined_inpainted_rgb_image = rgb_image.copy()
             combined_inpainted_disparity_image = disparity_image.copy()
 
@@ -99,8 +105,40 @@ class JointRGBAndDepthInpainter:
             show_image_ui(combined_inpainted_rgb_image)
             show_image_ui(combined_inpainted_disparity_image)
         
-        elif self.options.inpaint_method == OccludingObjectsInpaintMethod.OtsuMask:
+        elif self.option.inpaint_method == OccludingObjectsInpaintMethod.OtsuMask:
             foreground_mask = create_foreground_mask(depth_image)
             inpaint_mask_image = np.ones(depth_image.shape)
             inpaint_mask_image[foreground_mask == 255] = 0
             self.__inpaint_with_inpaint_mask(rgb_image, depth_image, disparity_image, inpaint_mask_image)
+
+        elif self.option.inpaint_method == OccludingObjectsInpaintMethod.U2NetPretrained:
+            rgb_image_bgr = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
+            mask = self.u2_mask_model.predict_mask(rgb_image_bgr)
+            mask_numpy = mask.squeeze(0).cpu().detach().numpy()
+            mask_numpy_u16 = cv2.normalize(mask_numpy, None, 0, 2 ** 16-1, cv2.NORM_MINMAX, dtype=cv2.CV_16U)
+            thresh, binary_mask = cv2.threshold(
+                mask_numpy_u16,
+                np.min(mask_numpy_u16),
+                np.max(mask_numpy_u16),
+                cv2.THRESH_BINARY+cv2.THRESH_OTSU
+            )
+            mask_u8 = np.zeros_like(binary_mask, dtype=np.uint8)
+            mask_u8[binary_mask == 2 ** 16 - 1] = 255
+            show_image_ui(rgb_image)
+            show_image_ui(mask_u8, cmap=plt.cm.gray)
+            box = create_roi_from_u8_mask(mask_u8, margin=30)
+
+            inpaint_mask = np.ones_like(binary_mask, dtype=np.uint8)
+            inpaint_mask[binary_mask > thresh] = 0
+            inpaint_mask = cv2.erode(inpaint_mask, kernel=np.ones((3,3)), iterations=7)
+            show_image_ui(inpaint_mask)
+            inpainted_rgb_image, inpainted_disparity_image = self.__inpaint_with_inpaint_mask(
+                rgb_image_bgr[box], depth_image[box], disparity_image[box], inpaint_mask[box].astype(np.float32))
+
+            result_rgb_image = rgb_image.copy()
+            result_rgb_image[box][inpaint_mask[box] == 0] = (inpainted_rgb_image * 255)[inpaint_mask[box] == 0]
+            result_disparity_image = disparity_image.copy()
+            result_disparity_image[box][inpaint_mask[box] == 0] = inpainted_disparity_image[inpaint_mask[box] == 0]
+
+            show_image_ui(result_rgb_image)
+            show_image_ui(result_disparity_image)
