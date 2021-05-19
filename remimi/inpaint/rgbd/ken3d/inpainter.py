@@ -114,7 +114,10 @@ class JointRGBAndDepthInpainter:
         elif self.option.inpaint_method == OccludingObjectsInpaintMethod.U2NetPretrained:
             rgb_image_bgr = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
             mask = self.u2_mask_model.predict_mask(rgb_image_bgr)
+            show_image_ui(rgb_image)
             mask_numpy = mask.squeeze(0).cpu().detach().numpy()
+            st.write("## Gray Scale Mask")
+            show_image_ui(mask_numpy, cmap=plt.cm.gray)
             mask_numpy_u16 = cv2.normalize(mask_numpy, None, 0, 2 ** 16-1, cv2.NORM_MINMAX, dtype=cv2.CV_16U)
             thresh, binary_mask = cv2.threshold(
                 mask_numpy_u16,
@@ -124,14 +127,14 @@ class JointRGBAndDepthInpainter:
             )
             mask_u8 = np.zeros_like(binary_mask, dtype=np.uint8)
             mask_u8[binary_mask == 2 ** 16 - 1] = 255
-            show_image_ui(rgb_image)
+            st.write("## Binary Mask")
             show_image_ui(mask_u8, cmap=plt.cm.gray)
-            box = create_roi_from_u8_mask(mask_u8, margin=30)
+            box = create_roi_from_u8_mask(mask_u8, margin=20)
 
             inpaint_mask = np.ones_like(binary_mask, dtype=np.uint8)
             inpaint_mask[binary_mask > thresh] = 0
-            inpaint_mask = cv2.erode(inpaint_mask, kernel=np.ones((3,3)), iterations=7)
-            show_image_ui(inpaint_mask)
+            inpaint_mask = cv2.erode(inpaint_mask, kernel=np.ones((3,3)), iterations=3)
+            show_image_ui(inpaint_mask, cmap=plt.cm.gray)
             inpainted_rgb_image, inpainted_disparity_image = self.__inpaint_with_inpaint_mask(
                 rgb_image_bgr[box], depth_image[box], disparity_image[box], inpaint_mask[box].astype(np.float32))
 
