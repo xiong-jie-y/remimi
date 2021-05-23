@@ -49,23 +49,7 @@ def statistical_zero_crossing(laplacian_image, slope_threshold=95):
 def create_roi_from_foreground_and_background_slice(foreground_slice, background_slice, margin=0):
     mixed_fore_back_mask = np.zeros_like(foreground_slice, dtype=np.uint8)
     mixed_fore_back_mask[np.bitwise_or(foreground_slice, background_slice)] = 255
-    contours, hierarchy = cv2.findContours(mixed_fore_back_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    xs = []
-    ys = []
-    for contour in contours:
-        for pt_cont in contour:
-            point = pt_cont[0]
-            xs.append(point[0])
-            ys.append(point[1])
-    
-    min_x = max(np.min(xs) - margin, 0)
-    min_y = max(np.min(ys) - margin, 0)
-    max_x = min(np.max(xs) + margin, foreground_slice.shape[1])
-    max_y = min(np.max(ys) + margin, foreground_slice.shape[0])
-
-    box = np.s_[min_y:max_y, min_x:max_x]
-
-    return box
+    return create_roi_from_u8_mask(mixed_fore_back_mask, margin=0)
 
 def remove_outlier(depth_image):
     median = np.median(depth_image)

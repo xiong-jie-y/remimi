@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms#, utils
 # import torch.optim as optim
+import cv2
 
 import numpy as np
 from PIL import Image
@@ -54,18 +55,28 @@ def save_output(image_name,pred,d_dir):
 
     imo.save(d_dir+imidx+'.png')
 
-class U2MaskModel:
-    def __init__(self, model_name='u2net'):
-        file_path = get_model_file_from_gdrive("u2net_pretrained.pth", "https://drive.google.com/u/0/uc?id=1ao1ovG1Qtx4b7EoskHXmi2E9rp5CHLcZ&export=download")
+import dataclasses
+@dataclasses.dataclass
+class U2MaskModelOption:
+    model_name: str = "u2net"
 
+class U2MaskModel:
+    def __init__(self, option: U2MaskModelOption):
+        model_name = option.model_name
         net = None
+        file_path = None
         # --------- 3. model define ---------
         if(model_name=='u2net'):
+            file_path = get_model_file_from_gdrive("u2net_pretrained.pth", "https://drive.google.com/u/0/uc?id=1ao1ovG1Qtx4b7EoskHXmi2E9rp5CHLcZ&export=download")
             print("...load U2NET---173.6 MB")
             net = U2NET(3,1)
         elif(model_name=='u2netp'):
             print("...load U2NEP---4.7 MB")
             net = U2NETP(3,1)
+        elif(model_name=='u2net_anime'):
+            file_path = get_model_file_from_gdrive("u2net_pretrained_anime.pth", "https://drive.google.com/u/0/uc?id=1ao1ovG1Qtx4b7EoskHXmi2E9rp5CHLcZ&export=download")
+            print("...load U2NET---173.6 MB")
+            net = U2NET(3,1)
 
         if torch.cuda.is_available():
             net.load_state_dict(torch.load(file_path))
@@ -110,3 +121,16 @@ class U2MaskModel:
             del d1,d2,d3,d4,d5,d6,d7
 
             return F.interpolate(pred.unsqueeze(0), size=(image_bgr.shape[0], image_bgr.shape[1])).squeeze(0)
+
+    def convert_probability_mask_to_binary_mask(self, probability_mask_image):
+        mask_numpy_u16 = cv2.normalize(probability_mask_image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        thresh, binary_mask = cv2.threshold(
+            mask_numpy_u16,
+            0,
+            255,
+            cv2.THRESH_BINARY+cv2.THRESH_OTSU
+        )
+        mask_u8 = np.zeros_like(binary_mask, dtype=np.uint8)
+        mask_u8[binary_mask == 2 ** 16 - 1] = 255
+
+        return binary_mask
